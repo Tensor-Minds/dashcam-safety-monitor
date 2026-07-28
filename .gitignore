@@ -1,1 +1,25 @@
+# Dependencies
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Static generated videos
+dashcam-safety-monitor-backend/static/videos/
+*.mp4
+*.avi
+*.mov
+*.webm
+
+# Python bytecode & environments
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment files & OS files
 .env
+.env.local
+.DS_Store
+*.log

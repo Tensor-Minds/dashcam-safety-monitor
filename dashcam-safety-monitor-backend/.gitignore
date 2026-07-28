@@ -1,0 +1,27 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Static video exports
+static/videos/
+*.mp4
+*.avi
+*.mov
+*.webm
+
+# Environment & IDE
+.env
+.venv/
+env/
+venv/
+ENV/
+.idea/
+.vscode/
+*.swp
+
+# Temporary & test files
+temp/
+tmp/
