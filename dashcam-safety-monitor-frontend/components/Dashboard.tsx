@@ -19,8 +19,10 @@ import {
   Download,
   Eye,
   Zap,
-  GitCommit,
-  Disc
+  CheckCircle2,
+  Sparkles,
+  Loader2,
+  Clock
 } from "lucide-react";
 
 export interface Detection {
@@ -67,8 +69,8 @@ export interface ProcessedVideoResult {
 
 const DASHBOARD_MODELS = [
   { id: "anomaly", label: "P1: Anomaly", activeClass: "bg-red-500/20 text-red-400 border-red-500/50 shadow-sm shadow-red-500/20" },
-  { id: "lane_line", label: "P2: Lane Lines", activeClass: "bg-cyan-500/20 text-cyan-400 border-cyan-500/50" },
-  { id: "pothole", label: "P3: Potholes", activeClass: "bg-orange-500/20 text-orange-400 border-orange-500/50" },
+  { id: "pothole", label: "P2: Potholes", activeClass: "bg-orange-500/20 text-orange-400 border-orange-500/50" },
+  { id: "lane_line", label: "P3: Lane Lines", activeClass: "bg-cyan-500/20 text-cyan-400 border-cyan-500/50" },
   { id: "road_sign", label: "P4: Road Signs", activeClass: "bg-yellow-500/20 text-yellow-400 border-yellow-500/50" }
 ];
 
@@ -115,6 +117,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [currentPriority, setCurrentPriority] = useState<string>("normal");
   const [stats, setStats] = useState({ totalFrames: 0, totalAlerts: 0 });
 
+  // Processing Timer Counter for Server Video processing
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
   const lastAlertFeedUpdateRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
   isPlayingRef.current = isPlaying;
@@ -127,6 +132,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+
+  // Timer effect for server processing loader
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isServerProcessingVideo) {
+      setElapsedSeconds(0);
+      interval = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isServerProcessingVideo]);
 
   // Pre-load audio alert element
   useEffect(() => {
@@ -158,6 +177,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         // Ignore audio errors
       }
     }
+  };
+
+  // Format timer into MM:SS format
+  const formatTimer = (totalSec: number) => {
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    const mStr = m < 10 ? `0${m}` : `${m}`;
+    const sStr = s < 10 ? `0${s}` : `${s}`;
+    return `${mStr}:${sStr}s`;
   };
 
   // Trigger audio on image processing result
@@ -209,7 +237,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             const now = Date.now();
             if (data.detections && data.detections.length > 0 && now - lastAlertFeedUpdateRef.current > 350) {
               lastAlertFeedUpdateRef.current = now;
-              const pRank = data.highest_priority === "anomaly" ? 1 : data.highest_priority === "lane_line" ? 2 : data.highest_priority === "pothole" ? 3 : 4;
+              const pRank = data.highest_priority === "anomaly" ? 1 : data.highest_priority === "pothole" ? 2 : data.highest_priority === "lane_line" ? 3 : 4;
               const newAlert = {
                 id: `${now}-${Math.random()}`,
                 timestamp: new Date().toLocaleTimeString(),
@@ -365,10 +393,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     switch (priority) {
       case "anomaly":
         return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-red-500/20 text-red-400 border border-red-500/50 shadow-sm shadow-red-500/20 flex items-center gap-1.5"><Flame className="w-3.5 h-3.5 text-red-400" /> PRIORITY 1: CRITICAL ANOMALY</span>;
-      case "lane_line":
-        return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-cyan-400" /> PRIORITY 2: LANE DEPARTURE</span>;
       case "pothole":
-        return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-orange-500/20 text-orange-400 border border-orange-500/50 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-orange-400" /> PRIORITY 3: POTHOLE HAZARD</span>;
+        return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-orange-500/20 text-orange-400 border border-orange-500/50 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-orange-400" /> PRIORITY 2: POTHOLE HAZARD</span>;
+      case "lane_line":
+        return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-cyan-400" /> PRIORITY 3: LANE DEPARTURE</span>;
       case "road_sign":
         return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 flex items-center gap-1.5"><Layers className="w-3.5 h-3.5 text-yellow-400" /> PRIORITY 4: ROAD SIGN</span>;
       default:
@@ -384,8 +412,62 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const apiHost = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <canvas ref={canvasRef} className="hidden" />
+
+      {/* SERVER VIDEO PROCESSING MODAL OVERLAY */}
+      {isServerProcessingVideo && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-lg flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 relative overflow-hidden ring-1 ring-indigo-500/20">
+            {/* Top gradient glowing line */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-400 animate-pulse" />
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl text-indigo-400 relative">
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-lg">Server Rendering Full Video</h3>
+                  <p className="text-xs text-slate-400">Processing all frames via PyTorch & OpenCV</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl font-mono text-xs text-indigo-300">
+                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                <span>{formatTimer(elapsedSeconds)}</span>
+              </div>
+            </div>
+
+            {/* Step Progress Checklist */}
+            <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+              <div className="flex items-center gap-3 text-xs font-semibold text-emerald-400">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Uploaded Video File Payload to FastAPI Backend</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-semibold text-indigo-300">
+                <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+                <span>Executing Optimized Inference Stride ({selectedModels.join(", ")})</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
+                <span>Drawing OpenCV Priority Boxes & Exporting MP4 Video</span>
+              </div>
+            </div>
+
+            {/* Shimmering Progress Bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-slate-400 font-mono">
+                <span>Accelerated Video Rendering...</span>
+                <span className="text-indigo-400 font-bold">Please Wait</span>
+              </div>
+              <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                <div className="h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-cyan-400 rounded-full animate-pulse w-3/4" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top Header Bar */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
@@ -520,8 +602,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <span className="font-bold text-white text-xs">{det.class_name}</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           det.priority_level === "CRITICAL" ? "bg-red-500/20 text-red-400 border border-red-500/40" :
-                          det.priority_level === "HIGH" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" :
-                          det.priority_level === "MEDIUM" ? "bg-orange-500/20 text-orange-400 border border-orange-500/40" :
+                          det.priority_level === "HIGH" ? "bg-orange-500/20 text-orange-400 border border-orange-500/40" :
+                          det.priority_level === "MEDIUM" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" :
                           "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40"
                         }`}>
                           {det.priority_level || "LOW"}
@@ -545,29 +627,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
             {/* Action Bar for Server-Side Video Processing vs Live Streaming */}
-            <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-2xl flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-bold text-white">Video Processing Options</h3>
-                <p className="text-xs text-slate-400">Active Models: <span className="text-indigo-300 font-semibold">{selectedModels.length === 0 ? "ALL 4 MODELS PARALLEL" : selectedModels.join(", ")}</span></p>
+            <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  <h3 className="text-sm font-bold text-white">Full Video Bounding Box Generator</h3>
+                </div>
+                <p className="text-xs text-slate-400 max-w-md">
+                  Accelerated server pipeline with OpenCV priority bounding boxes & MP4 video download.
+                </p>
               </div>
 
               {onRunServerVideoProcess && (
                 <button
                   onClick={onRunServerVideoProcess}
                   disabled={isServerProcessingVideo}
-                  className="px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 shadow-md flex items-center gap-2 transition-all"
+                  className="px-5 py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 shadow-lg shadow-indigo-500/20 flex items-center gap-2.5 transition-all transform active:scale-95"
                 >
-                  {isServerProcessingVideo ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Processing Video on Server...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FileVideo className="w-4 h-4" />
-                      <span>Generate Full Bounding Box Video on Server</span>
-                    </>
-                  )}
+                  <FileVideo className="w-4 h-4 text-white" />
+                  <span>Generate Full Bounding Box Video on Server</span>
                 </button>
               )}
             </div>
@@ -728,8 +806,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   >
                     <option value="ALL" className="bg-slate-900 text-white">All Priorities</option>
                     <option value="ANOMALY" className="bg-slate-900 text-red-400">P1: Critical</option>
-                    <option value="LANE_LINE" className="bg-slate-900 text-cyan-400">P2: High</option>
-                    <option value="POTHOLE" className="bg-slate-900 text-orange-400">P3: Medium</option>
+                    <option value="POTHOLE" className="bg-slate-900 text-orange-400">P2: High</option>
+                    <option value="LANE_LINE" className="bg-slate-900 text-cyan-400">P3: Medium</option>
                     <option value="ROAD_SIGN" className="bg-slate-900 text-yellow-400">P4: Low</option>
                   </select>
                 </div>
