@@ -1,6 +1,9 @@
 # Road anomaly detection
 
-Yolo model type: Yolov8s
+Yolo model type: Yolov8n
 
 Classes:
-- Fighting 0
+0: Accident
+1: Car Fire
+2: Fighting
+3: Snatching
