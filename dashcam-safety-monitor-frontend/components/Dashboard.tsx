@@ -22,7 +22,10 @@ import {
   CheckCircle2,
   Sparkles,
   Loader2,
-  Clock
+  Clock,
+  Cpu,
+  ShieldCheck,
+  Video
 } from "lucide-react";
 
 export interface Detection {
@@ -415,54 +418,79 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="space-y-6 relative">
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* SERVER VIDEO PROCESSING MODAL OVERLAY */}
+      {/* ULTRA-MODERN HIGH-TECH SERVER PROCESSING MODAL OVERLAY */}
       {isServerProcessingVideo && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-lg flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 relative overflow-hidden ring-1 ring-indigo-500/20">
-            {/* Top gradient glowing line */}
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-400 animate-pulse" />
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-slate-900/90 border border-indigo-500/50 rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 relative overflow-hidden ring-1 ring-indigo-500/30">
+            
+            {/* Pulsing neon top accent bar */}
+            <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-violet-600 via-indigo-500 to-cyan-400 animate-pulse" />
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl text-indigo-400 relative">
-                  <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-white text-lg">Server Rendering Full Video</h3>
-                  <p className="text-xs text-slate-400">Processing all frames via PyTorch & OpenCV</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl font-mono text-xs text-indigo-300">
-                <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                <span>{formatTimer(elapsedSeconds)}</span>
+            {/* Central Animated Radar / AI Scanner graphic */}
+            <div className="relative flex items-center justify-center py-3">
+              <div className="absolute w-28 h-28 rounded-full border border-indigo-500/20 animate-ping" />
+              <div className="absolute w-20 h-20 rounded-full border-2 border-indigo-500/40 border-t-indigo-400 animate-spin" />
+              <div className="p-5 bg-gradient-to-tr from-indigo-600 to-violet-600 rounded-3xl shadow-xl shadow-indigo-500/30 relative z-10 flex items-center justify-center">
+                <Cpu className="w-8 h-8 text-white animate-pulse" />
               </div>
             </div>
 
-            {/* Step Progress Checklist */}
-            <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+            <div className="text-center space-y-1">
+              <h3 className="text-xl font-extrabold text-white tracking-wide">
+                Server Rendering Full Bounding Box Video
+              </h3>
+              <p className="text-xs text-slate-400">
+                Executing multi-model PyTorch pipeline with OpenCV priority overlay
+              </p>
+            </div>
+
+            {/* Live Metrics & Timer Bar */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-semibold">Elapsed Time</span>
+                  <span className="text-lg font-extrabold text-indigo-400 font-mono">
+                    {formatTimer(elapsedSeconds)}
+                  </span>
+                </div>
+                <Clock className="w-5 h-5 text-indigo-400 opacity-60" />
+              </div>
+
+              <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-semibold">Engine Speed</span>
+                  <span className="text-xs font-bold text-emerald-400">Stride 3 (Fast)</span>
+                </div>
+                <Zap className="w-5 h-5 text-emerald-400 opacity-60" />
+              </div>
+            </div>
+
+            {/* Step-by-Step Live Processing Checklist */}
+            <div className="space-y-3 bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
               <div className="flex items-center gap-3 text-xs font-semibold text-emerald-400">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
                 <span>Uploaded Video File Payload to FastAPI Backend</span>
               </div>
               <div className="flex items-center gap-3 text-xs font-semibold text-indigo-300">
-                <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
-                <span>Executing Optimized Inference Stride ({selectedModels.join(", ")})</span>
+                <Loader2 className="w-4 h-4 shrink-0 text-indigo-400 animate-spin" />
+                <span>Evaluating Active Models ({selectedModels.join(", ")})</span>
               </div>
               <div className="flex items-center gap-3 text-xs text-slate-400">
-                <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
-                <span>Drawing OpenCV Priority Boxes & Exporting MP4 Video</span>
+                <ShieldCheck className="w-4 h-4 shrink-0 text-slate-600" />
+                <span>Generating Annotated MP4 Video with Download Link</span>
               </div>
             </div>
 
-            {/* Shimmering Progress Bar */}
+            {/* Glowing Shimmer Progress Bar */}
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-slate-400 font-mono">
-                <span>Accelerated Video Rendering...</span>
+                <span className="flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Rendering Frames...
+                </span>
                 <span className="text-indigo-400 font-bold">Please Wait</span>
               </div>
-              <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-                <div className="h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-cyan-400 rounded-full animate-pulse w-3/4" />
+              <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800 relative">
+                <div className="h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-cyan-400 rounded-full animate-pulse w-4/5" />
               </div>
             </div>
           </div>
