@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ModelSelector } from "@/components/ModelSelector";
 import { MediaUploader } from "@/components/MediaUploader";
 import { Dashboard, ProcessedImageResult, ProcessedVideoResult } from "@/components/Dashboard";

@@ -54,7 +54,7 @@ async def process_image(
     file: UploadFile = File(...),
     models: str = Form("road_sign,pothole,lane_line,anomaly")
 ):
-    if not file.content_type.startswith("image/"):
+    if not (file.content_type and file.content_type.startswith("image/")):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
 
     try:

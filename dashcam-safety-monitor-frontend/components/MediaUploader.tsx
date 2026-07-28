@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, ChangeEvent, DragEvent } from "react";
-import { UploadCloud, FileImage, FileVideo, X, Play, ArrowRight, AlertCircle } from "lucide-react";
+import { UploadCloud, FileImage, FileVideo, X, ArrowRight, AlertCircle } from "lucide-react";
 
 interface MediaUploaderProps {
   onMediaSubmit: (file: File, mediaType: "image" | "video") => void;
@@ -116,11 +116,10 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-200 ${
-            isDragOver
+          className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-200 ${isDragOver
               ? "border-indigo-500 bg-indigo-500/10 scale-[1.01]"
               : "border-slate-800 hover:border-slate-700 bg-slate-950/40 hover:bg-slate-900/50"
-          }`}
+            }`}
         >
           <input
             type="file"

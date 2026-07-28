@@ -1,4 +1,4 @@
-# Road sign detection detection
+# Road sign detection
 
 Yolo model type: Yolov8n
 

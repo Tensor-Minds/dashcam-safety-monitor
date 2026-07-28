@@ -24,8 +24,7 @@ import {
   Loader2,
   Clock,
   Cpu,
-  ShieldCheck,
-  Video
+  ShieldCheck
 } from "lucide-react";
 
 export interface Detection {
@@ -111,7 +110,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [wsErrorDetail, setWsErrorDetail] = useState<string | null>(null);
   const [liveAnnotatedFrame, setLiveAnnotatedFrame] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState<boolean>(true);
-  
+
   // Alert Feed State & Priority Filter
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
   const [alertsFeed, setAlertsFeed] = useState<
@@ -174,7 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         audioRef.current.currentTime = 0;
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
-          playPromise.catch(() => {});
+          playPromise.catch(() => { });
         }
       } catch {
         // Ignore audio errors
@@ -207,7 +206,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/video";
     setWsStatus("connecting");
     setWsErrorDetail(null);
-    
+
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -222,7 +221,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         try {
           const data = JSON.parse(event.data);
           if (data.status === "connected") return;
-          
+
           if (data.status === "success") {
             if (data.annotated_frame) {
               setLiveAnnotatedFrame(data.annotated_frame);
@@ -260,7 +259,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       ws.onerror = () => {
         console.warn("[Dashboard WS] Connection error or backend unreachable.");
         setWsStatus("error");
-        setWsErrorDetail("WebSocket server unreachable at ws://localhost:8000/ws/video. Ensure FastAPI backend is running on port 8000.");
+        setWsErrorDetail(`WebSocket server unreachable at ${wsUrl}. Ensure the backend is running and reachable.`);
       };
 
       ws.onclose = () => {
@@ -357,7 +356,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const toggleVideoPlay = () => {
     if (!videoRef.current) return;
-    
+
     if (wsStatus !== "connected") {
       connectWebSocket();
     }
@@ -422,7 +421,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {isServerProcessingVideo && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
           <div className="bg-slate-900/90 border border-indigo-500/50 rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 relative overflow-hidden ring-1 ring-indigo-500/30">
-            
+
             {/* Pulsing neon top accent bar */}
             <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-violet-600 via-indigo-500 to-cyan-400 animate-pulse" />
 
@@ -521,11 +520,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
-              soundEnabled
-                ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40 hover:bg-indigo-600/30"
-                : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
-            }`}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${soundEnabled
+              ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40 hover:bg-indigo-600/30"
+              : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
+              }`}
           >
             {soundEnabled ? <Volume2 className="w-4 h-4 text-indigo-400" /> : <VolumeX className="w-4 h-4" />}
             <span>Web Audio {soundEnabled ? "ON" : "MUTED"}</span>
@@ -555,11 +553,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 key={m.id}
                 type="button"
                 onClick={() => toggleModelPill(m.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all ${
-                  active
-                    ? m.activeClass
-                    : "bg-slate-950 text-slate-500 border-slate-800 opacity-50 hover:opacity-90"
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all ${active
+                  ? m.activeClass
+                  : "bg-slate-950 text-slate-500 border-slate-800 opacity-50 hover:opacity-90"
+                  }`}
               >
                 {active ? "✓ " : "+ "}{m.label}
               </button>
@@ -628,12 +625,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-white text-xs">{det.class_name}</span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          det.priority_level === "CRITICAL" ? "bg-red-500/20 text-red-400 border border-red-500/40" :
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${det.priority_level === "CRITICAL" ? "bg-red-500/20 text-red-400 border border-red-500/40" :
                           det.priority_level === "HIGH" ? "bg-orange-500/20 text-orange-400 border border-orange-500/40" :
-                          det.priority_level === "MEDIUM" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" :
-                          "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40"
-                        }`}>
+                            det.priority_level === "MEDIUM" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" :
+                              "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40"
+                          }`}>
                           {det.priority_level || "LOW"}
                         </span>
                       </div>
@@ -858,11 +854,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div
                       key={idx}
                       onClick={() => setSelectedTimelineIdx(idx)}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                        selectedTimelineIdx === idx
-                          ? "bg-indigo-600/20 border-indigo-500/60 shadow-md"
-                          : "bg-slate-950/70 border-slate-800 hover:border-slate-700"
-                      }`}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all ${selectedTimelineIdx === idx
+                        ? "bg-indigo-600/20 border-indigo-500/60 shadow-md"
+                        : "bg-slate-950/70 border-slate-800 hover:border-slate-700"
+                        }`}
                     >
                       <div className="flex items-center justify-between text-[11px] mb-1">
                         <span className="text-slate-400 font-mono">Frame {item.frame_idx} ({item.timestamp}s)</span>
