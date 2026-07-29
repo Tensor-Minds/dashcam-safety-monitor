@@ -7,6 +7,14 @@ import base64
 import asyncio
 import tempfile
 import numpy as np
+
+# Load environment variables from .env if python-dotenv is installed
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,7 +53,19 @@ def read_root():
     return {
         "status": "online",
         "service": "Dashcam Road Safety Monitor API",
-        "available_models": ["road_sign", "pothole", "lane_line", "anomaly"]
+        "available_models": ["road_sign", "pothole", "lane_line", "anomaly"],
+        "model_confidence_thresholds": {
+            "road_sign": float(os.getenv("CONF_ROAD_SIGN", os.getenv("DEFAULT_MODEL_CONFIDENCE", "0.15"))),
+            "pothole": float(os.getenv("CONF_POTHOLE", os.getenv("DEFAULT_MODEL_CONFIDENCE", "0.15"))),
+            "anomaly": float(os.getenv("CONF_ANOMALY", os.getenv("DEFAULT_MODEL_CONFIDENCE", "0.15"))),
+            "lane_line": float(os.getenv("CONF_LANE_LINE", os.getenv("DEFAULT_MODEL_CONFIDENCE", "0.15")))
+        },
+        "detection_confidence_thresholds": {
+            "road_sign": float(os.getenv("DET_CONF_ROAD_SIGN", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15"))),
+            "pothole": float(os.getenv("DET_CONF_POTHOLE", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15"))),
+            "anomaly": float(os.getenv("DET_CONF_ANOMALY", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15"))),
+            "lane_line": float(os.getenv("DET_CONF_LANE_LINE", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15")))
+        }
     }
 
 
