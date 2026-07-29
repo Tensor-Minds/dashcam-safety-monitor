@@ -18,7 +18,7 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     id: "anomaly",
     name: "Anomaly Detection",
     category: "Critical Hazard",
-    description: "Detects debris, sudden obstacles, and dangerous vehicle tailgating.",
+    description: "Detects potential accidents, vehicle fires, fighting, and snatching incidents.",
     priority: "Priority 1 (Highest)",
     color: "bg-red-500/20 text-red-400 border-red-500/40",
     icon: ShieldAlert
@@ -89,7 +89,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-xl font-bold text-white tracking-wide">YOLOv8 Parallel Model Pipeline</h2>
+            <h2 className="text-xl font-bold text-white tracking-wide">YOLOv8 Multi-Model Pipeline</h2>
           </div>
           <p className="text-sm text-slate-400 mt-1">
             Select active deep learning detection models for inference execution.

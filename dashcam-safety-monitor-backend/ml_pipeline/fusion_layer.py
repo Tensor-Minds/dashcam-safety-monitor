@@ -1,12 +1,14 @@
 import cv2
 import numpy as np
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from collections import deque
 
 from ml_pipeline.modules.road_sign import RoadSignDetector
 from ml_pipeline.modules.pothole import PotholeDetector
 from ml_pipeline.modules.lane_line import LaneLineDetector
 from ml_pipeline.modules.anomaly import AnomalyDetector
+from ml_pipeline.alert_pipeline import ReportAlertPipeline
+from ml_pipeline.rule_config import RuleConfiguration
 
 # Fine-Grained Per-Class Priority Taxonomy Map
 CLASS_PRIORITY_MAP = {
@@ -110,12 +112,42 @@ class FusionManager:
             "lane_line": LaneLineDetector(),
             "anomaly": AnomalyDetector()
         }
+        self.rule_config = RuleConfiguration()
+        self.alert_pipeline = ReportAlertPipeline(self.rule_config)
+        self._apply_model_rule_settings()
+        self.last_primary_alert = None
+        self.last_image_quality = None
+
+    def _apply_model_rule_settings(self):
+        road_sign = self.detectors.get("road_sign")
+        if road_sign:
+            road_sign.nms_iou = self.rule_config.data["road_sign_filter"][
+                "nms_iou_threshold"
+            ]
+        pothole = self.detectors.get("pothole")
+        if pothole:
+            pothole.nms_iou = self.rule_config.data["pothole_filter"][
+                "nms_iou_threshold"
+            ]
+
+    def replace_rules(self, data: Dict[str, Any]):
+        self.rule_config.replace(data)
+        self.alert_pipeline.update_rule_config(self.rule_config)
+        self._apply_model_rule_settings()
+
+    def reload_rules(self):
+        self.rule_config.reload()
+        self.alert_pipeline.update_rule_config(self.rule_config)
+        self._apply_model_rule_settings()
 
     def reset_state(self):
         """Reset temporal queue states."""
         pothole_det = self.detectors.get("pothole")
         if pothole_det and hasattr(pothole_det, "reset_history"):
             pothole_det.reset_history()
+        self.alert_pipeline.reset()
+        self.last_primary_alert = None
+        self.last_image_quality = None
 
     def calculate_iou(self, boxA: List[int], boxB: List[int]) -> float:
         """Computes Intersection-over-Union (IoU) between two bounding boxes [x1, y1, x2, y2]."""
@@ -172,22 +204,22 @@ class FusionManager:
 
         return keep
 
-    def render_annotations(self, frame: np.ndarray, detections: List[Dict[str, Any]]) -> np.ndarray:
-        """Renders OpenCV bounding boxes and priority banners onto frame copy."""
+    def render_annotations(
+        self,
+        frame: np.ndarray,
+        detections: List[Dict[str, Any]],
+        primary_alert: Optional[Dict[str, Any]] = None,
+        image_quality: Optional[Dict[str, Any]] = None,
+    ) -> np.ndarray:
+        """Render thin raw boxes, stronger confirmed hazards, and one alert banner."""
         annotated_frame = frame.copy()
         for det in detections:
             x1, y1, x2, y2 = det["bbox"]
             color = det.get("color", [0, 255, 0])
             p_level = det.get("priority_level", "LOW")
             label = f"[{p_level}] {det['class_name']} ({int(det['confidence'] * 100)}%)"
-
-            # Semi-transparent overlay box
-            overlay = annotated_frame.copy()
-            cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
-            cv2.addWeighted(overlay, 0.2, annotated_frame, 0.8, 0, annotated_frame)
-
-            # Border rectangle
-            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 3)
+            active = det.get("alert_state") == "active"
+            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 4 if active else 1)
 
             # Label banner
             (text_w, text_h), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
@@ -208,13 +240,41 @@ class FusionManager:
                 2,
                 cv2.LINE_AA
             )
+        if primary_alert:
+            overlay = annotated_frame.copy()
+            cv2.rectangle(overlay, (0, 0), (annotated_frame.shape[1], 54), (20, 20, 150), -1)
+            cv2.addWeighted(overlay, 0.75, annotated_frame, 0.25, 0, annotated_frame)
+            cv2.putText(
+                annotated_frame,
+                primary_alert["message"],
+                (18, 35),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.75,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA,
+            )
+        if image_quality and image_quality.get("status_trigger", False):
+            cv2.putText(
+                annotated_frame,
+                "LOW CAMERA VISIBILITY - ALERTS LIMITED",
+                (18, annotated_frame.shape[0] - 18),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (0, 215, 255),
+                2,
+                cv2.LINE_AA,
+            )
         return annotated_frame
 
     def process_frame(
         self,
         frame: np.ndarray,
         active_models: List[str],
-        is_video: bool = False
+        is_video: bool = False,
+        timestamp_ms: float = 0.0,
+        turn_signal: str = "off",
+        vehicle_speed_kmh: Optional[float] = None,
     ) -> Tuple[np.ndarray, List[Dict[str, Any]], str, bool]:
         raw_detections = []
         
@@ -246,20 +306,21 @@ class FusionManager:
                     except Exception as e:
                         print(f"[FusionManager] Error in model '{model_key}': {e}")
 
-        final_detections = self.suppress_duplicates(raw_detections, iou_threshold=0.5)
-
-        highest_priority = "normal"
-        highest_rank = 99
-
-        for det in final_detections:
-            cat = det["category"]
-            rank = det.get("priority_rank", 99)
-            if rank < highest_rank:
-                highest_rank = rank
-                highest_priority = cat
-
-        audio_trigger = len(final_detections) > 0
-        annotated_frame = self.render_annotations(frame, final_detections)
+        final_detections, primary_alert, quality = self.alert_pipeline.evaluate(
+            frame,
+            raw_detections,
+            timestamp_ms=timestamp_ms,
+            turn_signal=turn_signal,
+            vehicle_speed_kmh=vehicle_speed_kmh,
+            is_video=is_video,
+        )
+        self.last_primary_alert = primary_alert
+        self.last_image_quality = quality
+        highest_priority = primary_alert["category"] if primary_alert else "normal"
+        audio_trigger = bool(primary_alert and primary_alert.get("audio_trigger"))
+        annotated_frame = self.render_annotations(
+            frame, final_detections, primary_alert, quality
+        )
 
         serializable_detections = sanitize_for_json(final_detections)
         return annotated_frame, serializable_detections, highest_priority, audio_trigger

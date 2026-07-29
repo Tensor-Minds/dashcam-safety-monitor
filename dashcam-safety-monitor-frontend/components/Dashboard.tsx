@@ -44,7 +44,30 @@ export interface ProcessedImageResult {
   audio_trigger: boolean;
   total_detections: number;
   detections: Detection[];
+  primary_alert?: PrimaryAlert | null;
+  image_quality?: { usable: boolean; message?: string | null; blur_score: number };
   annotated_image: string;
+}
+
+export interface PrimaryAlert {
+  rule_id: string;
+  category: "anomaly" | "lane_line" | "pothole" | "road_sign";
+  message: string;
+  priority: number;
+  audio_key: "anomaly" | "lane_departure" | "pothole" | "road_sign";
+  audio_trigger: boolean;
+  timestamp_ms: number;
+  visible_until_ms: number;
+  evidence: Record<string, unknown>;
+}
+
+interface ConfiguredRule {
+  id: string;
+  enabled: boolean;
+  module: string;
+  labels: string[];
+  priority: number;
+  message: string;
 }
 
 export interface ProcessedVideoResult {
@@ -65,14 +88,16 @@ export interface ProcessedVideoResult {
     audio_trigger: boolean;
     total_detections: number;
     detections: Detection[];
+    primary_alert?: PrimaryAlert | null;
+    image_quality?: { usable: boolean; message?: string | null; blur_score: number };
     annotated_frame: string;
   }[];
 }
 
 const DASHBOARD_MODELS = [
   { id: "anomaly", label: "P1: Anomaly", activeClass: "bg-red-500/20 text-red-400 border-red-500/50 shadow-sm shadow-red-500/20" },
-  { id: "pothole", label: "P2: Potholes", activeClass: "bg-orange-500/20 text-orange-400 border-orange-500/50" },
-  { id: "lane_line", label: "P3: Lane Lines", activeClass: "bg-cyan-500/20 text-cyan-400 border-cyan-500/50" },
+  { id: "lane_line", label: "P2: Lane Lines", activeClass: "bg-cyan-500/20 text-cyan-400 border-cyan-500/50" },
+  { id: "pothole", label: "P3: Potholes", activeClass: "bg-orange-500/20 text-orange-400 border-orange-500/50" },
   { id: "road_sign", label: "P4: Road Signs", activeClass: "bg-yellow-500/20 text-yellow-400 border-yellow-500/50" }
 ];
 
@@ -84,7 +109,10 @@ interface DashboardProps {
   imageResult: ProcessedImageResult | null;
   videoResult: ProcessedVideoResult | null;
   onReset: () => void;
-  onRunServerVideoProcess?: () => void;
+  onRunServerVideoProcess?: (
+    turnSignal: "off" | "left" | "right",
+    simulatedSpeedKmh: number
+  ) => void;
   isServerProcessingVideo?: boolean;
 }
 
@@ -100,15 +128,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
   isServerProcessingVideo = false
 }) => {
   // Sound controls
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [turnSignal, setTurnSignal] = useState<"off" | "left" | "right">("off");
+  const [simulatedSpeedKmh, setSimulatedSpeedKmh] = useState(50);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const lastAudioTriggerRef = useRef<number>(0);
 
   // Video Streaming State
   const [isPlaying, setIsPlaying] = useState(false);
   const [wsStatus, setWsStatus] = useState<"disconnected" | "connecting" | "connected" | "error">("disconnected");
   const [wsErrorDetail, setWsErrorDetail] = useState<string | null>(null);
-  const [liveAnnotatedFrame, setLiveAnnotatedFrame] = useState<string | null>(null);
+  const [liveDetections, setLiveDetections] = useState<Detection[]>([]);
+  const [liveFrameSize, setLiveFrameSize] = useState({ width: 640, height: 360 });
   const [showOverlay, setShowOverlay] = useState<boolean>(true);
 
   // Alert Feed State & Priority Filter
@@ -117,6 +148,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     { id: string; timestamp: string; priority: string; priorityRank: number; detections: Detection[]; audioTrigger: boolean }[]
   >([]);
   const [currentPriority, setCurrentPriority] = useState<string>("normal");
+  const [currentPrimaryAlert, setCurrentPrimaryAlert] = useState<PrimaryAlert | null>(null);
+  const [configuredRules, setConfiguredRules] = useState<ConfiguredRule[]>([]);
   const [stats, setStats] = useState({ totalFrames: 0, totalAlerts: 0 });
 
   // Processing Timer Counter for Server Video processing
@@ -124,7 +157,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const lastAlertFeedUpdateRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
-  isPlayingRef.current = isPlaying;
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   // Timeline slider for server processed video
   const [selectedTimelineIdx, setSelectedTimelineIdx] = useState<number>(0);
@@ -139,7 +174,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isServerProcessingVideo) {
-      setElapsedSeconds(0);
       interval = setInterval(() => {
         setElapsedSeconds((prev) => prev + 1);
       }, 1000);
@@ -149,35 +183,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [isServerProcessingVideo]);
 
-  // Pre-load audio alert element
+  // Audio is generated locally and only enabled after an explicit user action.
   useEffect(() => {
-    const audio = new Audio("/alert.mp3");
-    audio.preload = "auto";
-    audioRef.current = audio;
-
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      audioContextRef.current?.close();
+      audioContextRef.current = null;
     };
   }, []);
 
-  // Non-blocking Audio playback function
-  const playAlertSound = (priorityLevel?: string) => {
-    if (!soundEnabled || !audioRef.current) return;
+  const playAlertSound = (audioKey: string = "road_sign") => {
+    if (!soundEnabled) return;
     const now = Date.now();
-    const cooldown = priorityLevel === "CRITICAL" ? 1200 : 1800;
-    if (now - lastAudioTriggerRef.current > cooldown) {
+    if (now - lastAudioTriggerRef.current > 5000) {
       lastAudioTriggerRef.current = now;
-      try {
-        audioRef.current.currentTime = 0;
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => { });
-        }
-      } catch {
-        // Ignore audio errors
-      }
+      const audio = audioContextRef.current;
+      if (!audio) return;
+      const frequencies =
+        audioKey === "anomaly" ? [880, 1040, 880] :
+          audioKey === "lane_departure" ? [330, 330] :
+            audioKey === "pothole" ? [560] : [720];
+      frequencies.forEach((frequency, index) => {
+        const oscillator = audio.createOscillator();
+        const gain = audio.createGain();
+        const start = audio.currentTime + index * 0.16;
+        oscillator.type = audioKey === "anomaly" ? "square" : "sine";
+        oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(0.12, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.13);
+        oscillator.connect(gain).connect(audio.destination);
+        oscillator.start(start);
+        oscillator.stop(start + 0.14);
+      });
     }
   };
 
@@ -193,7 +229,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Trigger audio on image processing result
   useEffect(() => {
     if (mediaType === "image" && imageResult?.audio_trigger) {
-      playAlertSound(imageResult.highest_priority === "anomaly" ? "CRITICAL" : "HIGH");
+      playAlertSound(imageResult.primary_alert?.audio_key || imageResult.highest_priority);
     }
   }, [imageResult, mediaType]);
 
@@ -223,17 +259,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           if (data.status === "connected") return;
 
           if (data.status === "success") {
-            if (data.annotated_frame) {
-              setLiveAnnotatedFrame(data.annotated_frame);
-            }
+            setLiveDetections(data.detections || []);
             setCurrentPriority(data.highest_priority);
+            setCurrentPrimaryAlert(data.primary_alert || null);
             setStats((prev) => ({
               totalFrames: prev.totalFrames + 1,
               totalAlerts: prev.totalAlerts + (data.detections.length > 0 ? 1 : 0)
             }));
 
             if (data.audio_trigger) {
-              playAlertSound(data.highest_priority === "anomaly" ? "CRITICAL" : "HIGH");
+              playAlertSound(data.primary_alert?.audio_key || data.highest_priority);
             }
 
             const now = Date.now();
@@ -268,9 +303,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           setTimeout(connectWebSocket, 500);
         }
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       setWsStatus("error");
-      setWsErrorDetail(err.message || "Failed to initialize WebSocket connection.");
+      setWsErrorDetail(err instanceof Error ? err.message : "Failed to initialize WebSocket connection.");
     }
   };
 
@@ -302,7 +337,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [mediaType, mediaFile, videoResult]);
 
-  // Frame capture loop over WebSocket (~15 fps)
+  // Frame capture loop over WebSocket (target ~10 fps, matching the report).
   const streamFrameLoop = () => {
     if (!videoRef.current || !canvasRef.current) {
       return;
@@ -330,8 +365,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     const ctx = canvas.getContext("2d");
     if (ctx && video.videoWidth > 0 && video.videoHeight > 0) {
-      canvas.width = Math.min(640, video.videoWidth);
-      canvas.height = Math.min(360, video.videoHeight);
+      const captureScale = Math.min(
+        1,
+        640 / video.videoWidth,
+        360 / video.videoHeight
+      );
+      canvas.width = Math.max(1, Math.round(video.videoWidth * captureScale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * captureScale));
+      setLiveFrameSize((current) =>
+        current.width === canvas.width && current.height === canvas.height
+          ? current
+          : { width: canvas.width, height: canvas.height }
+      );
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       const frame_b64 = canvas.toDataURL("image/jpeg", 0.75);
@@ -341,6 +386,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         active_models: selectedModels,
         frame_idx: video.currentTime,
         timestamp: video.currentTime,
+        turn_signal: turnSignal,
+        simulated_vehicle_speed_kmh: simulatedSpeedKmh,
+        include_annotated_frame: false,
         frame_b64: frame_b64
       };
 
@@ -351,7 +399,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (isPlayingRef.current) {
         animationFrameRef.current = requestAnimationFrame(streamFrameLoop);
       }
-    }, 65);
+    }, 100);
   };
 
   const toggleVideoPlay = (e?: React.MouseEvent) => {
@@ -403,7 +451,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onSelectedModelsChange(next);
   };
 
-  const runAllModelsParallel = () => {
+  const runAllModels = () => {
     onSelectedModelsChange(["anomaly", "lane_line", "pothole", "road_sign"]);
   };
 
@@ -412,9 +460,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
       case "anomaly":
         return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-red-500/20 text-red-400 border border-red-500/50 shadow-sm shadow-red-500/20 flex items-center gap-1.5"><Flame className="w-3.5 h-3.5 text-red-400" /> PRIORITY 1: CRITICAL ANOMALY</span>;
       case "pothole":
-        return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-orange-500/20 text-orange-400 border border-orange-500/50 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-orange-400" /> PRIORITY 2: POTHOLE HAZARD</span>;
+        return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-orange-500/20 text-orange-400 border border-orange-500/50 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5 text-orange-400" /> PRIORITY 3: POTHOLE HAZARD</span>;
       case "lane_line":
-        return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-cyan-400" /> PRIORITY 3: LANE DEPARTURE</span>;
+        return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-cyan-400" /> PRIORITY 2: LANE DEPARTURE</span>;
       case "road_sign":
         return <span className="px-3 py-1 rounded-md text-xs font-extrabold bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 flex items-center gap-1.5"><Layers className="w-3.5 h-3.5 text-yellow-400" /> PRIORITY 4: ROAD SIGN</span>;
       default:
@@ -428,6 +476,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
   });
 
   const apiHost = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${apiHost}/api/rules`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Rule configuration unavailable")))
+      .then((data: { rules: ConfiguredRule[] }) => {
+        if (!cancelled) {
+          setConfiguredRules(
+            [...data.rules].sort((left, right) => right.priority - left.priority)
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setConfiguredRules([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiHost]);
 
   return (
     <div className="space-y-6 relative">
@@ -528,22 +595,57 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Running Parallel Pipeline: <code className="text-indigo-300 font-bold">{selectedModels.length === 0 ? "ALL 4 MODELS" : selectedModels.join(", ")}</code>
+              Running multi-model pipeline: <code className="text-indigo-300 font-bold">{selectedModels.length === 0 ? "ALL 4 MODELS" : selectedModels.join(", ")}</code>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
+            onClick={() => {
+              if (!soundEnabled && !audioContextRef.current) {
+                audioContextRef.current = new AudioContext();
+              }
+              setSoundEnabled(!soundEnabled);
+            }}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${soundEnabled
               ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40 hover:bg-indigo-600/30"
               : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
               }`}
           >
             {soundEnabled ? <Volume2 className="w-4 h-4 text-indigo-400" /> : <VolumeX className="w-4 h-4" />}
-            <span>Web Audio {soundEnabled ? "ON" : "MUTED"}</span>
+            <span>{soundEnabled ? "Alert audio enabled" : "Enable alert audio"}</span>
           </button>
+
+          <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs bg-slate-800 border border-slate-700 text-slate-300">
+            Demo turn signal
+            <select
+              value={turnSignal}
+              onChange={(event) => setTurnSignal(event.target.value as "off" | "left" | "right")}
+              className="bg-slate-900 rounded px-2 py-1"
+            >
+              <option value="off">Off</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </label>
+
+          <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs bg-slate-800 border border-slate-700 text-slate-300">
+            Demo speed
+            <input
+              type="number"
+              min={0}
+              max={300}
+              value={simulatedSpeedKmh}
+              onChange={(event) =>
+                setSimulatedSpeedKmh(
+                  Math.min(300, Math.max(0, Number(event.target.value) || 0))
+                )
+              }
+              className="w-16 bg-slate-900 rounded px-2 py-1"
+            />
+            km/h
+          </label>
 
           <button
             onClick={onReset}
@@ -553,6 +655,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {currentPrimaryAlert && (
+        <div className="rounded-2xl border border-red-500/50 bg-red-500/15 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-red-300">
+              Highest-priority active rule
+            </p>
+            <p className="font-bold text-white text-lg">{currentPrimaryAlert.message}</p>
+          </div>
+          <div className="text-right text-xs text-slate-300">
+            <p>Rule: <strong>{currentPrimaryAlert.rule_id}</strong></p>
+            <p>Numeric priority: <strong>{currentPrimaryAlert.priority}</strong></p>
+          </div>
+        </div>
+      )}
 
       {/* Dynamic Model Control Bar (Change active models live after upload) */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
@@ -581,10 +698,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <button
             type="button"
-            onClick={runAllModelsParallel}
+            onClick={runAllModels}
             className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md hover:from-violet-500 hover:to-indigo-500 transition-all ml-1"
           >
-            ⚡ Run All Parallel
+            ⚡ Run All Models
           </button>
         </div>
       </div>
@@ -680,7 +797,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
               {onRunServerVideoProcess && (
                 <button
-                  onClick={onRunServerVideoProcess}
+                  onClick={() =>
+                    onRunServerVideoProcess(turnSignal, simulatedSpeedKmh)
+                  }
                   disabled={isServerProcessingVideo}
                   className="px-5 py-3 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 shadow-lg shadow-indigo-500/20 flex items-center gap-2.5 transition-all transform active:scale-95"
                 >
@@ -801,12 +920,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     className="w-full max-h-[460px] object-contain block"
                   />
 
-                  {showOverlay && liveAnnotatedFrame && (
-                    <img
-                      src={liveAnnotatedFrame}
-                      alt="Live YOLO WebSocket stream overlay"
-                      className="absolute inset-0 w-full h-full object-contain pointer-events-none z-10 opacity-90"
-                    />
+                  {showOverlay && liveDetections.length > 0 && (
+                    <svg
+                      viewBox={`0 0 ${liveFrameSize.width} ${liveFrameSize.height}`}
+                      preserveAspectRatio="xMidYMid meet"
+                      aria-label="Live detection overlay"
+                      className="absolute inset-0 w-full h-full pointer-events-none z-10"
+                    >
+                      {liveDetections.map((detection, index) => {
+                        const [x1, y1, x2, y2] = detection.bbox;
+                        const colour = `rgb(${detection.color[2]}, ${detection.color[1]}, ${detection.color[0]})`;
+                        const label = `${detection.class_name} ${(detection.confidence * 100).toFixed(0)}%`;
+                        return (
+                          <g key={`${detection.category}-${index}`}>
+                            <rect
+                              x={x1}
+                              y={y1}
+                              width={Math.max(0, x2 - x1)}
+                              height={Math.max(0, y2 - y1)}
+                              fill="transparent"
+                              stroke={colour}
+                              strokeWidth={detection.priority_level === "CRITICAL" ? 3 : 2}
+                              vectorEffect="non-scaling-stroke"
+                            />
+                            <text
+                              x={x1 + 3}
+                              y={Math.max(14, y1 - 5)}
+                              fill={colour}
+                              stroke="black"
+                              strokeWidth="0.8"
+                              paintOrder="stroke"
+                              fontSize="12"
+                              fontWeight="700"
+                            >
+                              {label}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
                   )}
                 </div>
 
@@ -849,8 +1001,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   >
                     <option value="ALL" className="bg-slate-900 text-white">All Priorities</option>
                     <option value="ANOMALY" className="bg-slate-900 text-red-400">P1: Critical</option>
-                    <option value="POTHOLE" className="bg-slate-900 text-orange-400">P2: High</option>
-                    <option value="LANE_LINE" className="bg-slate-900 text-cyan-400">P3: Medium</option>
+                    <option value="LANE_LINE" className="bg-slate-900 text-cyan-400">P2: Lane departure</option>
+                    <option value="POTHOLE" className="bg-slate-900 text-orange-400">P3: Pothole</option>
                     <option value="ROAD_SIGN" className="bg-slate-900 text-yellow-400">P4: Low</option>
                   </select>
                 </div>
@@ -918,6 +1070,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       )}
+
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-sm font-bold text-white">Configured Alert Rules</h3>
+            <p className="text-xs text-slate-400">
+              Higher numeric priority wins. Edit backend/ml_pipeline/rules.yml or PUT /api/rules.
+            </p>
+          </div>
+          <span className="text-xs text-indigo-300">{configuredRules.length} rules</span>
+        </div>
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2">
+          {configuredRules.map((rule) => (
+            <div key={rule.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <code className="text-xs text-indigo-300">{rule.id}</code>
+                <span className="rounded bg-indigo-500/20 border border-indigo-500/30 px-2 py-0.5 text-xs font-bold text-indigo-200">
+                  Priority {rule.priority}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-2">{rule.message}</p>
+              <p className="text-[10px] text-slate-500 mt-1">
+                {rule.module} · {rule.labels.join(", ")} · {rule.enabled ? "enabled" : "disabled"}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
