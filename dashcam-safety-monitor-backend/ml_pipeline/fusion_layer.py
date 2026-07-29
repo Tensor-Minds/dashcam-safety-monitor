@@ -25,10 +25,18 @@ CLASS_PRIORITY_MAP = {
     "pedestrian-crossing-ahead": {"rank": 2, "level": "HIGH", "color": [0, 165, 255]},
     "children crossing": {"rank": 2, "level": "HIGH", "color": [0, 165, 255]},
     "children-present-or-crossing-ahead": {"rank": 2, "level": "HIGH", "color": [0, 165, 255]},
+    "crossing": {"rank": 2, "level": "HIGH", "color": [255, 255, 0]},
+    "slow": {"rank": 2, "level": "HIGH", "color": [255, 255, 0]},
+    "bus lane": {"rank": 2, "level": "HIGH", "color": [255, 255, 0]},
+    "bicycle": {"rank": 2, "level": "HIGH", "color": [255, 255, 0]},
 
     # Rank 3: MEDIUM Hazards (Color: Amber/Yellow [0, 215, 255])
     "longitudinal_crack": {"rank": 3, "level": "MEDIUM", "color": [0, 215, 255]},
     "transverse_crack": {"rank": 3, "level": "MEDIUM", "color": [0, 215, 255]},
+    "yellow markings": {"rank": 3, "level": "MEDIUM", "color": [255, 255, 0]},
+    "line 1": {"rank": 3, "level": "MEDIUM", "color": [255, 255, 0]},
+    "line 2": {"rank": 3, "level": "MEDIUM", "color": [255, 255, 0]},
+    "romb": {"rank": 3, "level": "MEDIUM", "color": [255, 255, 0]},
     "stop-ahead": {"rank": 3, "level": "MEDIUM", "color": [0, 215, 255]},
     "left-bend-ahead": {"rank": 3, "level": "MEDIUM", "color": [0, 215, 255]},
     "right-bend-ahead": {"rank": 3, "level": "MEDIUM", "color": [0, 215, 255]},
@@ -43,6 +51,11 @@ CLASS_PRIORITY_MAP = {
     "bus-stop": {"rank": 4, "level": "LOW", "color": [255, 255, 0]},
     "hospital": {"rank": 4, "level": "LOW", "color": [255, 255, 0]},
     "no honking": {"rank": 4, "level": "LOW", "color": [255, 255, 0]},
+    "left arrow": {"rank": 4, "level": "LOW", "color": [255, 255, 0]},
+    "forward arrow": {"rank": 4, "level": "LOW", "color": [255, 255, 0]},
+    "forward arrow -left": {"rank": 4, "level": "LOW", "color": [255, 255, 0]},
+    "forward arrow -right": {"rank": 4, "level": "LOW", "color": [255, 255, 0]},
+    "right arrow": {"rank": 4, "level": "LOW", "color": [255, 255, 0]},
 }
 
 MODEL_ALIAS_MAP = {
@@ -159,64 +172,10 @@ class FusionManager:
 
         return keep
 
-    def process_frame(
-        self,
-        frame: np.ndarray,
-        active_models: List[str],
-        is_video: bool = False
-    ) -> Tuple[np.ndarray, List[Dict[str, Any]], str, bool]:
-        raw_detections = []
-        
-        # Parse active models
-        parsed_active = set()
-        for m in active_models:
-            m_clean = m.lower().strip()
-            if m_clean in MODEL_ALIAS_MAP:
-                parsed_active.add(MODEL_ALIAS_MAP[m_clean])
-            elif m_clean == "all":
-                parsed_active = {"anomaly", "lane_line", "pothole", "road_sign"}
-
-        # Default fallback: If no active model specified, run all 4 models in parallel
-        if not parsed_active:
-            parsed_active = {"anomaly", "lane_line", "pothole", "road_sign"}
-
-        # Route frame to activated models in parallel
-        for model_key in ["anomaly", "lane_line", "pothole", "road_sign"]:
-            if model_key in parsed_active:
-                detector = self.detectors.get(model_key)
-                if detector:
-                    try:
-                        dets = detector.detect(frame, is_video=is_video)
-                        for d in dets:
-                            c_name = d.get("class_name", "")
-                            cat = d.get("category", model_key)
-                            rank, level, color = self.get_class_priority(c_name, cat)
-                            d["priority_rank"] = rank
-                            d["priority_level"] = level
-                            d["color"] = color
-                        raw_detections.extend(dets)
-                    except Exception as e:
-                        print(f"[FusionManager] Error in model '{model_key}': {e}")
-
-        # Suppress duplicate bounding boxes (IoU > 0.5)
-        final_detections = self.suppress_duplicates(raw_detections, iou_threshold=0.5)
-
-        highest_priority = "normal"
-        highest_rank = 99
-
-        for det in final_detections:
-            cat = det["category"]
-            rank = det.get("priority_rank", 99)
-            if rank < highest_rank:
-                highest_rank = rank
-                highest_priority = cat
-
-        # Alert for all detected classes
-        audio_trigger = len(final_detections) > 0
-
-        # Render OpenCV annotations onto frame copy
+    def render_annotations(self, frame: np.ndarray, detections: List[Dict[str, Any]]) -> np.ndarray:
+        """Renders OpenCV bounding boxes and priority banners onto frame copy."""
         annotated_frame = frame.copy()
-        for det in final_detections:
+        for det in detections:
             x1, y1, x2, y2 = det["bbox"]
             color = det.get("color", [0, 255, 0])
             p_level = det.get("priority_level", "LOW")
@@ -249,6 +208,58 @@ class FusionManager:
                 2,
                 cv2.LINE_AA
             )
+        return annotated_frame
+
+    def process_frame(
+        self,
+        frame: np.ndarray,
+        active_models: List[str],
+        is_video: bool = False
+    ) -> Tuple[np.ndarray, List[Dict[str, Any]], str, bool]:
+        raw_detections = []
+        
+        parsed_active = set()
+        for m in active_models:
+            m_clean = m.lower().strip()
+            if m_clean in MODEL_ALIAS_MAP:
+                parsed_active.add(MODEL_ALIAS_MAP[m_clean])
+            elif m_clean == "all":
+                parsed_active = {"anomaly", "lane_line", "pothole", "road_sign"}
+
+        if not parsed_active:
+            parsed_active = {"anomaly", "lane_line", "pothole", "road_sign"}
+
+        for model_key in ["anomaly", "lane_line", "pothole", "road_sign"]:
+            if model_key in parsed_active:
+                detector = self.detectors.get(model_key)
+                if detector:
+                    try:
+                        dets = detector.detect(frame, is_video=is_video)
+                        for d in dets:
+                            c_name = d.get("class_name", "")
+                            cat = d.get("category", model_key)
+                            rank, level, color = self.get_class_priority(c_name, cat)
+                            d["priority_rank"] = rank
+                            d["priority_level"] = level
+                            d["color"] = color
+                        raw_detections.extend(dets)
+                    except Exception as e:
+                        print(f"[FusionManager] Error in model '{model_key}': {e}")
+
+        final_detections = self.suppress_duplicates(raw_detections, iou_threshold=0.5)
+
+        highest_priority = "normal"
+        highest_rank = 99
+
+        for det in final_detections:
+            cat = det["category"]
+            rank = det.get("priority_rank", 99)
+            if rank < highest_rank:
+                highest_rank = rank
+                highest_priority = cat
+
+        audio_trigger = len(final_detections) > 0
+        annotated_frame = self.render_annotations(frame, final_detections)
 
         serializable_detections = sanitize_for_json(final_detections)
         return annotated_frame, serializable_detections, highest_priority, audio_trigger
