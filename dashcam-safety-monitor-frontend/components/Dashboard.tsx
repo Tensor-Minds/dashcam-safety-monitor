@@ -259,7 +259,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       ws.onerror = () => {
         console.warn("[Dashboard WS] Connection error or backend unreachable.");
         setWsStatus("error");
-        setWsErrorDetail(`WebSocket server unreachable at ${wsUrl}. Ensure the backend is running and reachable.`);
+        setWsErrorDetail(`WebSocket server unreachable at ${wsUrl}. Ensure backend is running on port 8000.`);
       };
 
       ws.onclose = () => {
@@ -354,7 +354,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }, 65);
   };
 
-  const toggleVideoPlay = () => {
+  const toggleVideoPlay = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!videoRef.current) return;
 
     if (wsStatus !== "connected") {
@@ -374,6 +375,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }).catch((err) => {
         console.error("Video play error:", err);
       });
+    }
+  };
+
+  const handleVideoPlayEvent = () => {
+    setIsPlaying(true);
+    if (!animationFrameRef.current) {
+      animationFrameRef.current = requestAnimationFrame(streamFrameLoop);
+    }
+  };
+
+  const handleVideoPauseEvent = () => {
+    setIsPlaying(false);
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
   };
 
@@ -780,6 +796,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     muted
                     loop
                     controls
+                    onPlay={handleVideoPlayEvent}
+                    onPause={handleVideoPauseEvent}
                     className="w-full max-h-[460px] object-contain block"
                   />
 
@@ -792,18 +810,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   )}
                 </div>
 
+                {/* Single Primary Control Action Button */}
                 <div className="flex items-center justify-between gap-4">
                   <button
-                    onClick={toggleVideoPlay}
-                    className="flex-1 py-3 px-6 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all"
+                    onClick={(e) => toggleVideoPlay(e)}
+                    className="flex-1 py-3.5 px-6 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40 shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2.5 transition-all transform active:scale-[0.99]"
                   >
                     {isPlaying ? (
                       <>
-                        <Pause className="w-5 h-5" /> Pause Video Stream
+                        <Pause className="w-5 h-5 fill-current" /> Pause Live Video Stream
                       </>
                     ) : (
                       <>
-                        <Play className="w-5 h-5 fill-current" /> Play Video & Start Safety Stream
+                        <Play className="w-5 h-5 fill-current" /> Start Live Video Safety Stream
                       </>
                     )}
                   </button>
