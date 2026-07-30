@@ -286,9 +286,6 @@ class FusionManager:
             elif m_clean == "all":
                 parsed_active = {"anomaly", "lane_line", "pothole", "road_sign"}
 
-        if not parsed_active:
-            parsed_active = {"anomaly", "lane_line", "pothole", "road_sign"}
-
         for model_key in ["anomaly", "lane_line", "pothole", "road_sign"]:
             if model_key in parsed_active:
                 detector = self.detectors.get(model_key)
