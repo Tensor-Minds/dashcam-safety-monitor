@@ -28,7 +28,7 @@ LANE_LINE_CLASSES = {
 class LaneLineDetector:
     """
     Lane Line & Road Surface Marking Detection Module.
-    Weights file: ml_pipeline/weights/lane-line/best-7.pt
+    Weights file: ml_pipeline/weights/lane-line/best.pt
     Detects ONLY the 13 classes specified in weights/lane-line/Readme.md
     """
 
@@ -38,7 +38,7 @@ class LaneLineDetector:
 
         if weights_path is None:
             weights_dir = os.path.join(
-                os.path.dirname(__file__), "..", "weights", "lane-line", "best-7.pt"
+                os.path.dirname(__file__), "..", "weights", "lane-line", "best.pt"
             )
             weights_path = os.path.abspath(weights_dir)
 

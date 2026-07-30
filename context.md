@@ -28,7 +28,7 @@ It consists of:
 |  [FusionManager]                                                                 |
 |     ├── RoadSignDetector     (weights/road-sign/best.pt - 35 classes)             |
 |     ├── PotholeDetector      (weights/pothole/yolov8s-350-epoch-coslrtrue.pt)    |
-|     ├── LaneLineDetector     (weights/lane-line/best-7.pt - 13 classes)          |
+|     ├── LaneLineDetector     (weights/lane-line/best.pt - 13 classes)          |
 |     └── AnomalyDetector      (weights/road-anomaly/best.pt - 4 classes)           |
 |                                                                                   |
 |  [Post-Processing]                                                                |

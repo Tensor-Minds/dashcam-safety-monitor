@@ -16,7 +16,7 @@ Controls the minimum probability required for YOLO candidate bounding boxes duri
 | `CONF_ROAD_SIGN` | `float` | `0.15` | Inference confidence threshold for Traffic Sign Detection (`best.pt`) |
 | `CONF_POTHOLE` | `float` | `0.15` | Inference confidence threshold for Pothole Detection (`yolov8s-350-epoch-coslrtrue.pt`) |
 | `CONF_ANOMALY` | `float` | `0.15` | Inference confidence threshold for Road Anomaly Detection (`best.pt`) |
-| `CONF_LANE_LINE` | `float` | `0.15` | Inference confidence threshold for Lane Line & Marking Detection (`best-7.pt`) |
+| `CONF_LANE_LINE` | `float` | `0.15` | Inference confidence threshold for Lane Line & Marking Detection (`best.pt`) |
 | `DEFAULT_MODEL_CONFIDENCE` | `float` | `0.15` | Default fallback threshold if a model-specific `CONF_*` variable is omitted |
 
 ---
