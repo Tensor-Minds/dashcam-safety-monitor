@@ -307,7 +307,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
       return;
     }
 
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/video";
+    const wsProtocol =
+      typeof window !== "undefined" && window.location.protocol === "https:"
+        ? "wss:"
+        : "ws:";
+    const wsHost =
+      typeof window !== "undefined" ? window.location.hostname : "localhost";
+    const wsUrl =
+      process.env.NEXT_PUBLIC_WS_URL ||
+      `${wsProtocol}//${wsHost}:8000/ws/video`;
     setWsStatus("connecting");
     setWsErrorDetail(null);
 
@@ -549,7 +557,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return a.priority.toUpperCase() === priorityFilter.toUpperCase();
   });
 
-  const apiHost = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const apiProtocol =
+    typeof window !== "undefined" ? window.location.protocol : "http:";
+  const apiHostname =
+    typeof window !== "undefined" ? window.location.hostname : "localhost";
+  const apiHost =
+    process.env.NEXT_PUBLIC_API_URL ||
+    `${apiProtocol}//${apiHostname}:8000`;
 
   useEffect(() => {
     let cancelled = false;
