@@ -53,9 +53,9 @@ export default function Home() {
 
       const data: ProcessedImageResult = await response.json();
       setImageResult(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Image processing error:", err);
-      setErrorMsg(err.message || `Could not connect to FastAPI backend server at ${getApiHost()}`);
+      setErrorMsg(err instanceof Error ? err.message : `Could not connect to FastAPI backend server at ${getApiHost()}`);
     } finally {
       setIsProcessing(false);
     }
@@ -80,7 +80,10 @@ export default function Home() {
     }
   };
 
-  const handleRunServerVideoProcess = async () => {
+  const handleRunServerVideoProcess = async (
+    turnSignal: "off" | "left" | "right",
+    simulatedSpeedKmh: number
+  ) => {
     if (!mediaFile || mediaType !== "video") return;
     setIsServerProcessingVideo(true);
     setErrorMsg(null);
@@ -90,6 +93,8 @@ export default function Home() {
       formData.append("file", mediaFile);
       const modelsToSend = selectedModels.length > 0 ? selectedModels.join(",") : "anomaly,lane_line,pothole,road_sign";
       formData.append("models", modelsToSend);
+      formData.append("turn_signal", turnSignal);
+      formData.append("simulated_vehicle_speed_kmh", String(simulatedSpeedKmh));
 
       const apiHost = getApiHost();
       const response = await fetch(`${apiHost}/api/process-video`, {
@@ -104,9 +109,9 @@ export default function Home() {
 
       const data: ProcessedVideoResult = await response.json();
       setVideoResult(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Server video processing error:", err);
-      setErrorMsg(err.message || `Server-side video processing failed. Make sure FastAPI backend is running on ${getApiHost()}`);
+      setErrorMsg(err instanceof Error ? err.message : `Server-side video processing failed. Make sure FastAPI backend is running on ${getApiHost()}`);
     } finally {
       setIsServerProcessingVideo(false);
     }
@@ -145,7 +150,7 @@ export default function Home() {
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                Real-Time Multi-Model Vision Pipeline for Hazard Detection & Emergency Audio Alerts
+                Advisory multi-model vision pipeline for visual and audio road-safety alerts
               </p>
             </div>
           </div>
@@ -208,7 +213,7 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="pt-8 border-t border-slate-800/60 text-center text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 Dashcam Road Safety Monitoring System. Built with FastAPI, PyTorch, YOLOv8 & Next.js.</p>
+          <p>Advisory demonstration only - it does not control steering, braking, throttle, or vehicle movement.</p>
           <div className="flex items-center gap-4 text-slate-400">
             <span>Road Signs</span> • <span>Potholes</span> • <span>Lane Boundaries</span> • <span>Anomalies</span>
           </div>

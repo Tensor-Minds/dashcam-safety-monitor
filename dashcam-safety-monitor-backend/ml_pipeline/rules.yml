@@ -1,0 +1,485 @@
+version: "2.0"
+priority_policy: higher_number_wins
+
+# Demonstration defaults derived from the interim proposal. These thresholds are
+# configurable and are not claimed to be scientifically validated.
+system:
+  processing_target_fps: 10
+  tracking_iou_threshold: 0.30
+  duplicate_iou_threshold: 0.50
+  visual_duration_ms: 2000
+  global_alert_cooldown_ms: 5000
+  maximum_track_misses: 2
+  minimum_blur_score: 80
+  minimum_mean_brightness: 25
+  maximum_mean_brightness: 235
+  image_quality_status_cooldown_ms: 10000
+
+road_sign_filter:
+  minimum_confidence: 0.60
+  nms_iou_threshold: 0.45
+  minimum_aspect_ratio: 0.50
+  maximum_aspect_ratio: 1.50
+  minimum_frame_area_ratio: 0.005
+
+pothole_filter:
+  minimum_confidence: 0.40
+  nms_iou_threshold: 0.40
+  medium_bottom_y_ratio: 0.50
+  near_bottom_y_ratio: 0.70
+  # Used only when two usable lane boundaries cannot be derived.
+  fallback_roi_left_ratio: 0.25
+  fallback_roi_right_ratio: 0.75
+  fallback_roi_minimum_bottom_y_ratio: 0.35
+
+anomaly_filter:
+  minimum_confidence: 0.55
+
+lane:
+  minimum_confidence: 0.50
+  ema_alpha: 0.70
+  trigger_offset_ratio: 0.35
+  clear_offset_ratio: 0.20
+  minimum_duration_ms: 1500
+
+# Priority is intentionally limited to 0..number_of_rules. The largest active
+# number wins, preserving proposal order:
+# anomaly > lane departure > pothole > road sign.
+rules:
+  - id: anomaly-accident
+    enabled: true
+    module: anomaly
+    labels: [Accident]
+    minimum_confidence: 0.55
+    severity: critical
+    priority: 14
+    temporal:
+      window_frames: 6
+      minimum_hits: 4
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Potential road accident detected ahead
+    audio_key: anomaly
+    conditions: {}
+
+  - id: anomaly-car-fire
+    enabled: true
+    module: anomaly
+    labels: [Car Fire]
+    minimum_confidence: 0.55
+    severity: critical
+    priority: 14
+    temporal:
+      window_frames: 6
+      minimum_hits: 4
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Potential vehicle fire detected ahead
+    audio_key: anomaly
+    conditions: {}
+
+  - id: anomaly-fighting
+    enabled: true
+    module: anomaly
+    labels: [Fighting]
+    minimum_confidence: 0.55
+    severity: critical
+    priority: 14
+    temporal:
+      window_frames: 6
+      minimum_hits: 4
+      minimum_duration_ms: 2000
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Potential fighting incident detected
+    audio_key: anomaly
+    conditions: {}
+
+  - id: anomaly-snatching
+    enabled: true
+    module: anomaly
+    labels: [Snatching]
+    minimum_confidence: 0.55
+    severity: critical
+    priority: 14
+    temporal:
+      window_frames: 6
+      minimum_hits: 4
+      minimum_duration_ms: 2000
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Potential snatching incident detected
+    audio_key: anomaly
+    conditions: {}
+
+  - id: lane-departure
+    enabled: true
+    module: lane_line
+    labels: [Lane Departure]
+    minimum_confidence: 0.50
+    severity: critical
+    priority: 13
+    temporal:
+      minimum_duration_ms: 1500
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Lane departure - drifting {direction}
+    audio_key: lane_departure
+    conditions:
+      matching_turn_signal_suppresses: true
+      unknown_turn_signal_suppresses: true
+
+  - id: pothole-near
+    enabled: true
+    module: pothole
+    labels: [Pothole]
+    minimum_confidence: 0.40
+    severity: critical
+    priority: 12
+    temporal:
+      window_frames: 5
+      minimum_hits: 4
+      maximum_misses: 1
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Warning - pothole very close in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: near
+
+  - id: pothole-medium
+    enabled: true
+    module: pothole
+    labels: [Pothole]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 11
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Warning - pothole ahead in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: medium
+
+  - id: pothole-far
+    enabled: true
+    module: pothole
+    labels: [Pothole]
+    minimum_confidence: 0.40
+    severity: info
+    priority: 10
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Pothole detected farther ahead in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: far
+
+  - id: alligator-crack-near
+    enabled: true
+    module: pothole
+    labels: [alligator_crack]
+    minimum_confidence: 0.40
+    severity: high
+    priority: 12
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Warning - alligator road cracking very close in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: near
+
+  - id: alligator-crack-medium
+    enabled: true
+    module: pothole
+    labels: [alligator_crack]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 11
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Alligator road cracking ahead in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: medium
+
+  - id: alligator-crack-far
+    enabled: true
+    module: pothole
+    labels: [alligator_crack]
+    minimum_confidence: 0.40
+    severity: info
+    priority: 10
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Alligator road cracking detected farther ahead
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: far
+
+  - id: longitudinal-crack-near
+    enabled: true
+    module: pothole
+    labels: [longitudinal_crack]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 12
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Warning - longitudinal road crack very close in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: near
+
+  - id: longitudinal-crack-medium
+    enabled: true
+    module: pothole
+    labels: [longitudinal_crack]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 11
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Longitudinal road crack ahead in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: medium
+
+  - id: longitudinal-crack-far
+    enabled: true
+    module: pothole
+    labels: [longitudinal_crack]
+    minimum_confidence: 0.40
+    severity: info
+    priority: 10
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Longitudinal road crack detected farther ahead
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: far
+
+  - id: transverse-crack-near
+    enabled: true
+    module: pothole
+    labels: [transverse_crack]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 12
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Warning - transverse road crack very close in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: near
+
+  - id: transverse-crack-medium
+    enabled: true
+    module: pothole
+    labels: [transverse_crack]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 11
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Transverse road crack ahead in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: medium
+
+  - id: transverse-crack-far
+    enabled: true
+    module: pothole
+    labels: [transverse_crack]
+    minimum_confidence: 0.40
+    severity: info
+    priority: 10
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Transverse road crack detected farther ahead
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: far
+
+  - id: speed-limit-exceeded
+    enabled: true
+    module: road_sign
+    labels: [Speed Limit]
+    minimum_confidence: 0.60
+    severity: warning
+    priority: 9
+    temporal:
+      window_frames: 5
+      minimum_hits: 3
+      minimum_duration_ms: 1500
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Reduce speed - {vehicle_speed_kmh} km/h in a {speed_limit_kmh} km/h zone
+    audio_key: road_sign
+    conditions:
+      speed_limit_exceeded: true
+      speed_tolerance_kmh: 5
+
+  - id: red-light
+    enabled: true
+    module: road_sign
+    labels: [Red-Light]
+    minimum_confidence: 0.60
+    severity: warning
+    priority: 8
+    temporal:
+      window_frames: 5
+      minimum_hits: 3
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 10000
+    message: Red traffic light detected
+    audio_key: road_sign
+    conditions: {}
+
+  - id: stop-sign
+    enabled: true
+    module: road_sign
+    labels: [Stop, Stop-Ahead]
+    minimum_confidence: 0.60
+    severity: warning
+    priority: 8
+    temporal:
+      window_frames: 5
+      minimum_hits: 3
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 10000
+    message: Stop sign ahead
+    audio_key: road_sign
+    conditions: {}
+
+  - id: warning-road-sign
+    enabled: true
+    module: road_sign
+    labels:
+      - Children-Present-Or-Crossing-Ahead
+      - Children-Crossing
+      - Double-Bend-To-Left-Ahead
+      - Double-Bend-To-Right-Ahead
+      - Left-Bend-Ahead
+      - Narrow-Bridge-Or-Culvert-Ahead
+      - Pedestrian-Crossing
+      - Pedestrian-Crossing-Ahead
+      - Right-Bend-Ahead
+      - T-Junction-Ahead
+      - Traffic-From-Left-Merges-Ahead
+      - Traffic-From-Right-Merges-Ahead
+      - Level-Crossing-With-Gates
+      - No-Left-Turn
+      - No-Right-Turn
+      - No-U-Turn
+    minimum_confidence: 0.60
+    severity: warning
+    priority: 7
+    temporal:
+      window_frames: 5
+      minimum_hits: 3
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 10000
+    message: "{sign_message}"
+    audio_key: road_sign
+    conditions: {}
+
+  - id: speed-limit-detected
+    enabled: true
+    module: road_sign
+    labels: [Speed Limit]
+    minimum_confidence: 0.60
+    severity: info
+    priority: 6
+    temporal:
+      window_frames: 5
+      minimum_hits: 3
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 10000
+    message: Speed limit {speed_limit_kmh} detected
+    audio_key: road_sign
+    conditions: {}
+
+  # Covers the remaining classes actually emitted by the current 35-class
+  # road-sign model. "Give Way" can be added when a trained model emits it.
+  - id: other-road-sign
+    enabled: true
+    module: road_sign
+    labels: ["*"]
+    minimum_confidence: 0.60
+    severity: info
+    priority: 5
+    temporal:
+      window_frames: 5
+      minimum_hits: 3
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 10000
+    message: "{sign_message}"
+    audio_key: road_sign
+    conditions: {}

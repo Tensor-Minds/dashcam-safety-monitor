@@ -66,7 +66,9 @@ class LaneLineDetector:
             try:
                 # 1. YOLO Model Inference Confidence Threshold
                 results = self.model(frame, conf=model_conf_to_use, verbose=False)[0]
-                for box in results.boxes:
+                masks = getattr(results, "masks", None)
+                polygons = masks.xy if masks is not None and getattr(masks, "xy", None) is not None else []
+                for box_index, box in enumerate(results.boxes):
                     cls_id = int(box.cls[0].item())
                     conf = float(box.conf[0].item())
 
@@ -83,13 +85,16 @@ class LaneLineDetector:
                         class_name = f"Lane Marking #{cls_id}"
 
                     x1, y1, x2, y2 = [int(v) for v in box.xyxy[0].tolist()]
-                    detections.append({
+                    detection = {
                         "bbox": [x1, y1, x2, y2],
                         "confidence": round(conf, 2),
                         "class_name": class_name,
                         "category": "lane_line",
                         "color": [255, 255, 0]  # Cyan / Yellow (BGR)
-                    })
+                    }
+                    if box_index < len(polygons):
+                        detection["polygon"] = polygons[box_index].tolist()
+                    detections.append(detection)
             except Exception as err:
                 print(f"[LaneLineDetector] Inference error: {err}")
 

@@ -57,6 +57,7 @@ class RoadSignDetector:
     def __init__(self, weights_path: str = None, model_conf: float = None, det_conf: float = None):
         self.model_conf = model_conf if model_conf is not None else DEFAULT_MODEL_CONF
         self.det_conf = det_conf if det_conf is not None else DEFAULT_DET_CONF
+        self.nms_iou = 0.45
 
         if weights_path is None:
             weights_dir = os.path.join(os.path.dirname(__file__), "..", "weights", "road-sign", "best.pt")
@@ -85,7 +86,9 @@ class RoadSignDetector:
         if self.initialized and self.model is not None:
             try:
                 # 1. YOLO Model Inference Confidence Threshold
-                results = self.model(frame, conf=model_conf_to_use, verbose=False)[0]
+                results = self.model(
+                    frame, conf=model_conf_to_use, iou=self.nms_iou, verbose=False
+                )[0]
                 for box in results.boxes:
                     cls_id = int(box.cls[0].item())
                     conf = float(box.conf[0].item())

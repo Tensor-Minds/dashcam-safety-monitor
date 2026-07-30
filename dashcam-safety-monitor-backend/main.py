@@ -7,6 +7,7 @@ import base64
 import asyncio
 import tempfile
 import numpy as np
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 # Load environment variables from .env if python-dotenv is installed
 try:
@@ -15,13 +16,42 @@ try:
 except ImportError:
     pass
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from ml_pipeline.fusion_layer import FusionManager, sanitize_for_json
+
+SUPPORTED_IMAGE_EXTENSIONS = (
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".gif",
+    ".avif",
+)
+
+
+def decode_uploaded_image(contents: bytes) -> Optional[np.ndarray]:
+    """Decode common image formats, using Pillow when OpenCV cannot read them."""
+    if not contents:
+        return None
+
+    frame = cv2.imdecode(np.frombuffer(contents, np.uint8), cv2.IMREAD_COLOR)
+    if frame is not None:
+        return frame
+
+    try:
+        with Image.open(io.BytesIO(contents)) as image:
+            image = ImageOps.exif_transpose(image).convert("RGB")
+            return cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
 
 app = FastAPI(
     title="Dashcam Road Safety Monitoring API",
@@ -65,32 +95,72 @@ def read_root():
             "pothole": float(os.getenv("DET_CONF_POTHOLE", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15"))),
             "anomaly": float(os.getenv("DET_CONF_ANOMALY", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15"))),
             "lane_line": float(os.getenv("DET_CONF_LANE_LINE", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15")))
-        }
+        },
+        "rule_version": fusion_manager.rule_config.data["version"],
+        "priority_policy": fusion_manager.rule_config.data["priority_policy"],
+        "configured_rule_count": len(fusion_manager.rule_config.rules),
+    }
+
+
+@app.get("/api/rules")
+def get_alert_rules():
+    """Return the complete editable rule set; higher numeric priority wins."""
+    return fusion_manager.rule_config.public_data()
+
+
+@app.put("/api/rules")
+def update_alert_rules(rule_set: Dict[str, Any]):
+    """Validate, persist, and activate a complete replacement rule set."""
+    try:
+        fusion_manager.replace_rules(rule_set)
+    except (ValueError, OSError, json.JSONDecodeError) as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    return {
+        "status": "updated",
+        "version": fusion_manager.rule_config.data["version"],
+        "priority_policy": fusion_manager.rule_config.data["priority_policy"],
+        "rule_count": len(fusion_manager.rule_config.rules),
     }
 
 
 @app.post("/api/process-image")
 async def process_image(
     file: UploadFile = File(...),
-    models: str = Form("road_sign,pothole,lane_line,anomaly")
+    models: str = Form("road_sign,pothole,lane_line,anomaly"),
+    turn_signal: str = Form("off"),
+    simulated_vehicle_speed_kmh: Optional[float] = Form(None, ge=0, le=300),
 ):
-    if not (file.content_type and file.content_type.startswith("image/")):
+    filename = (file.filename or "").lower()
+    has_image_type = bool(
+        file.content_type and file.content_type.startswith("image/")
+    )
+    has_image_extension = filename.endswith(SUPPORTED_IMAGE_EXTENSIONS)
+    if not (has_image_type or has_image_extension):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
 
     try:
         contents = await file.read()
-        nparr = np.frombuffer(contents, np.uint8)
-        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        frame = decode_uploaded_image(contents)
 
         if frame is None:
-            raise HTTPException(status_code=400, detail="Failed to decode image file.")
+            file_type = file.content_type or "unknown type"
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f'Could not decode "{file.filename or "uploaded image"}" '
+                    f"({file_type}). Upload a valid JPEG, PNG, WebP, BMP, TIFF, "
+                    "GIF, or AVIF image. Convert HEIC/HEIF photos to JPEG first."
+                ),
+            )
 
         active_models_list = [m.strip() for m in models.split(",") if m.strip()]
 
         annotated_frame, detections, highest_priority, audio_trigger = fusion_manager.process_frame(
             frame=frame,
             active_models=active_models_list,
-            is_video=False
+            is_video=False,
+            turn_signal=turn_signal,
+            vehicle_speed_kmh=simulated_vehicle_speed_kmh,
         )
 
         _, buffer = cv2.imencode(".jpg", annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
@@ -104,9 +174,13 @@ async def process_image(
             "audio_trigger": audio_trigger,
             "total_detections": len(detections),
             "detections": sanitize_for_json(detections),
+            "primary_alert": sanitize_for_json(fusion_manager.last_primary_alert),
+            "image_quality": sanitize_for_json(fusion_manager.last_image_quality),
             "annotated_image": data_url
         })
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Image processing error: {str(e)}")
 
@@ -114,7 +188,9 @@ async def process_image(
 @app.post("/api/process-video")
 async def process_video(
     file: UploadFile = File(...),
-    models: str = Form("road_sign,pothole,lane_line,anomaly")
+    models: str = Form("road_sign,pothole,lane_line,anomaly"),
+    turn_signal: str = Form("off"),
+    simulated_vehicle_speed_kmh: Optional[float] = Form(None, ge=0, le=300),
 ):
     if not (file.content_type.startswith("video/") or file.filename.endswith((".mp4", ".avi", ".mov", ".webm"))):
         raise HTTPException(status_code=400, detail="Uploaded file must be a video.")
@@ -151,18 +227,44 @@ async def process_video(
         category_counts = {"anomaly": 0, "lane_line": 0, "pothole": 0, "road_sign": 0}
 
         frame_idx = 0
-        sample_stride = max(1, int(fps / 10))
+        target_fps = fusion_manager.rule_config.system["processing_target_fps"]
+        sample_stride = max(1, round(fps / target_fps))
+        latest_detections = []
+        latest_primary_alert = None
 
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
 
-            annotated_frame, detections, highest_priority, audio_trigger = fusion_manager.process_frame(
-                frame=frame,
-                active_models=active_models_list,
-                is_video=True
-            )
+            timestamp_ms = frame_idx / fps * 1000
+            if frame_idx % sample_stride == 0:
+                annotated_frame, detections, highest_priority, audio_trigger = fusion_manager.process_frame(
+                    frame=frame,
+                    active_models=active_models_list,
+                    is_video=True,
+                    timestamp_ms=timestamp_ms,
+                    turn_signal=turn_signal,
+                    vehicle_speed_kmh=simulated_vehicle_speed_kmh,
+                )
+                latest_detections = detections
+                latest_primary_alert = fusion_manager.last_primary_alert
+            else:
+                visible_alert = (
+                    latest_primary_alert
+                    if latest_primary_alert
+                    and latest_primary_alert.get("visible_until_ms", 0) >= timestamp_ms
+                    else None
+                )
+                annotated_frame = fusion_manager.render_annotations(
+                    frame,
+                    latest_detections,
+                    visible_alert,
+                    fusion_manager.last_image_quality,
+                )
+                detections = []
+                highest_priority = visible_alert["category"] if visible_alert else "normal"
+                audio_trigger = False
 
             if writer:
                 writer.write(annotated_frame)
@@ -192,6 +294,8 @@ async def process_video(
                     "audio_trigger": audio_trigger,
                     "total_detections": len(detections),
                     "detections": sanitize_for_json(detections),
+                    "primary_alert": sanitize_for_json(fusion_manager.last_primary_alert),
+                    "image_quality": sanitize_for_json(fusion_manager.last_image_quality),
                     "annotated_frame": data_url
                 })
 
@@ -260,6 +364,16 @@ async def websocket_video_endpoint(websocket: WebSocket):
                 active_models = payload.get("active_models", ["road_sign", "pothole", "lane_line", "anomaly"])
                 frame_idx = payload.get("frame_idx", 0)
                 timestamp = payload.get("timestamp", 0.0)
+                turn_signal = payload.get("turn_signal", "off")
+                include_annotated_frame = payload.get("include_annotated_frame", True)
+                vehicle_speed_kmh = payload.get("simulated_vehicle_speed_kmh")
+                if vehicle_speed_kmh is not None:
+                    vehicle_speed_kmh = float(vehicle_speed_kmh)
+                    if not 0 <= vehicle_speed_kmh <= 300:
+                        await websocket.send_json(
+                            {"status": "error", "message": "Simulated speed must be between 0 and 300 km/h"}
+                        )
+                        continue
 
                 frame_b64 = payload.get("frame_b64")
                 if not frame_b64:
@@ -282,12 +396,21 @@ async def websocket_video_endpoint(websocket: WebSocket):
                 annotated_frame, detections, highest_priority, audio_trigger = fusion_manager.process_frame(
                     frame=frame,
                     active_models=active_models,
-                    is_video=True
+                    is_video=True,
+                    timestamp_ms=float(timestamp) * 1000,
+                    turn_signal=turn_signal,
+                    vehicle_speed_kmh=vehicle_speed_kmh,
                 )
 
-                _, buffer = cv2.imencode(".jpg", annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-                out_b64 = base64.b64encode(buffer).decode("utf-8")
-                data_url = f"data:image/jpeg;base64,{out_b64}"
+                data_url = None
+                if include_annotated_frame:
+                    _, buffer = cv2.imencode(
+                        ".jpg",
+                        annotated_frame,
+                        [int(cv2.IMWRITE_JPEG_QUALITY), 80],
+                    )
+                    out_b64 = base64.b64encode(buffer).decode("utf-8")
+                    data_url = f"data:image/jpeg;base64,{out_b64}"
 
                 response_payload = {
                     "status": "success",
@@ -297,6 +420,8 @@ async def websocket_video_endpoint(websocket: WebSocket):
                     "highest_priority": highest_priority,
                     "audio_trigger": audio_trigger,
                     "detections": sanitize_for_json(detections),
+                    "primary_alert": sanitize_for_json(fusion_manager.last_primary_alert),
+                    "image_quality": sanitize_for_json(fusion_manager.last_image_quality),
                     "annotated_frame": data_url
                 }
 
