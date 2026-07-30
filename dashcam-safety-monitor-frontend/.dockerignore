@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+build
+coverage
+.env*
+*.log
+.DS_Store
+.git
+.gitignore
+Dockerfile*
+README.md
+CLAUDE.md
+AGENTS.md
+context.md
