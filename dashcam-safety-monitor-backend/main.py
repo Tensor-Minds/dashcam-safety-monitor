@@ -7,6 +7,7 @@ import base64
 import asyncio
 import tempfile
 import numpy as np
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 # Load environment variables from .env if python-dotenv is installed
 try:
@@ -22,6 +23,35 @@ from fastapi.responses import Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from ml_pipeline.fusion_layer import FusionManager, sanitize_for_json
+
+SUPPORTED_IMAGE_EXTENSIONS = (
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".gif",
+    ".avif",
+)
+
+
+def decode_uploaded_image(contents: bytes) -> Optional[np.ndarray]:
+    """Decode common image formats, using Pillow when OpenCV cannot read them."""
+    if not contents:
+        return None
+
+    frame = cv2.imdecode(np.frombuffer(contents, np.uint8), cv2.IMREAD_COLOR)
+    if frame is not None:
+        return frame
+
+    try:
+        with Image.open(io.BytesIO(contents)) as image:
+            image = ImageOps.exif_transpose(image).convert("RGB")
+            return cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
 
 app = FastAPI(
     title="Dashcam Road Safety Monitoring API",
@@ -100,16 +130,28 @@ async def process_image(
     turn_signal: str = Form("off"),
     simulated_vehicle_speed_kmh: Optional[float] = Form(None, ge=0, le=300),
 ):
-    if not (file.content_type and file.content_type.startswith("image/")):
+    filename = (file.filename or "").lower()
+    has_image_type = bool(
+        file.content_type and file.content_type.startswith("image/")
+    )
+    has_image_extension = filename.endswith(SUPPORTED_IMAGE_EXTENSIONS)
+    if not (has_image_type or has_image_extension):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
 
     try:
         contents = await file.read()
-        nparr = np.frombuffer(contents, np.uint8)
-        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        frame = decode_uploaded_image(contents)
 
         if frame is None:
-            raise HTTPException(status_code=400, detail="Failed to decode image file.")
+            file_type = file.content_type or "unknown type"
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f'Could not decode "{file.filename or "uploaded image"}" '
+                    f"({file_type}). Upload a valid JPEG, PNG, WebP, BMP, TIFF, "
+                    "GIF, or AVIF image. Convert HEIC/HEIF photos to JPEG first."
+                ),
+            )
 
         active_models_list = [m.strip() for m in models.split(",") if m.strip()]
 
@@ -137,6 +179,8 @@ async def process_image(
             "annotated_image": data_url
         })
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Image processing error: {str(e)}")
 

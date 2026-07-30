@@ -3,6 +3,18 @@
 import React, { useState, useRef, ChangeEvent, DragEvent } from "react";
 import { UploadCloud, FileImage, FileVideo, X, ArrowRight, AlertCircle } from "lucide-react";
 
+const SUPPORTED_IMAGE_EXTENSIONS = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".bmp",
+  ".tif",
+  ".tiff",
+  ".gif",
+  ".avif",
+];
+
 interface MediaUploaderProps {
   onMediaSubmit: (file: File, mediaType: "image" | "video") => void;
   selectedModels: string[];
@@ -24,8 +36,19 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const processSelectedFile = (file: File) => {
     setErrorMsg(null);
     const type = file.type;
+    const lowerName = file.name.toLowerCase();
+    const isSupportedImage = SUPPORTED_IMAGE_EXTENSIONS.some((extension) =>
+      lowerName.endsWith(extension)
+    );
+    const isHeicImage =
+      type === "image/heic"
+      || type === "image/heif"
+      || lowerName.endsWith(".heic")
+      || lowerName.endsWith(".heif");
 
-    if (type.startsWith("image/")) {
+    if (isHeicImage) {
+      setErrorMsg("HEIC/HEIF photos are not supported by the image engine. Export or convert the photo to JPEG, PNG, or WebP and upload it again.");
+    } else if (isSupportedImage) {
       setMediaType("image");
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
@@ -34,7 +57,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
     } else {
-      setErrorMsg("Unsupported file format. Please upload an Image (PNG, JPG, WEBP) or Video (MP4, WEBM, MOV).");
+      setErrorMsg("Unsupported file format. Upload a JPEG, PNG, WebP, BMP, TIFF, GIF, or AVIF image, or an MP4, WebM, or MOV video.");
     }
   };
 
@@ -125,7 +148,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept="image/*,video/*"
+            accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.gif,.avif,.mp4,.webm,.mov,image/jpeg,image/png,image/webp,image/bmp,image/tiff,image/gif,image/avif,video/mp4,video/webm,video/quicktime"
             className="hidden"
           />
 
@@ -137,7 +160,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
             Drag & Drop Dashcam Media Here
           </h3>
           <p className="text-xs text-slate-400 mb-4 max-w-sm mx-auto">
-            Supports static images (<code className="text-indigo-300">.jpg, .png, .webp</code>) or dashcam video files (<code className="text-indigo-300">.mp4, .webm, .mov</code>).
+            Supports static images (<code className="text-indigo-300">.jpg, .png, .webp, .avif</code>) or dashcam video files (<code className="text-indigo-300">.mp4, .webm, .mov</code>).
           </p>
 
           <div className="flex items-center justify-center gap-3">
