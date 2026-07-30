@@ -24,7 +24,7 @@ The implementation follows Chapters 4 and 5 of the interim report:
 | Module | Decision rule |
 | :--- | :--- |
 | Road sign | Confidence >= 0.60, NMS IoU 0.45, aspect ratio 0.5-1.5, area >= 0.5% of frame, 3-of-5 temporal confirmation |
-| Pothole | Confidence >= 0.40, NMS IoU 0.40, same spatial track at IoU > 0.30, 4 detections in 6 processed frames, ego-lane and far/medium/near rules |
+| Pothole | Confidence >= 0.40, NMS IoU 0.40, same spatial track at IoU > 0.30, 15 detections in 20 processed frames, ego-lane and far/medium/near rules |
 | Lane departure | Second-order fit from segmentation polygons, EMA alpha 0.70, absolute offset >= 35% of lane width for 1.5 seconds, suppressed by the matching turn signal; clears below 20% |
 | Road anomaly | Accident, Car Fire, Fighting, or Snatching; confidence >= 0.55; same spatial track at IoU > 0.30; 4 detections in 6 processed frames |
 
@@ -34,7 +34,15 @@ one alert per 5-second window. Low image sharpness or brightness outside the con
 range suppresses alerts without hiding the raw model overlay.
 
 Audio is disabled until the user explicitly enables it. The browser generates distinct local
-tones for anomaly, lane-departure, pothole, and road-sign alerts.
+tones for anomaly, lane-departure, pothole, and road-sign alerts and can speak the winning
+rule's warning message using the browser speech-synthesis service.
+
+Every temporally confirmed road-surface hazard has an audio key, including far
+information-level alerts. The four model outputs - `Pothole`, `alligator_crack`,
+`longitudinal_crack`, and `transverse_crack` - have distinct messages and do not all claim to
+be severe potholes. Every class emitted by the current 35-class road-sign model is covered by
+either a specific rule or the wildcard sign rule and is converted to a natural spoken message
+such as `Pedestrian crossing ahead`.
 
 ## Configurable rule set
 

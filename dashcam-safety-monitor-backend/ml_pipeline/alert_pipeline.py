@@ -27,6 +27,31 @@ ANOMALY_LABELS = {
     "snatching": "Snatching",
 }
 SPEED_LIMIT = re.compile(r"^speed[ _-]*limit[ _-]*(\d{1,3})$", re.IGNORECASE)
+ROAD_SIGN_MESSAGES = {
+    "Green-Light": "Green traffic light detected",
+    "Red-Light": "Red traffic light ahead",
+    "Stop": "Stop sign ahead",
+    "Stop-Ahead": "Stop sign ahead",
+    "Bus-Stop": "Bus stop ahead",
+    "Children-Present-Or-Crossing-Ahead": "Children crossing ahead",
+    "Children-Crossing": "Children crossing ahead",
+    "Double-Bend-To-Left-Ahead": "Double bend to the left ahead",
+    "Double-Bend-To-Right-Ahead": "Double bend to the right ahead",
+    "Left-Bend-Ahead": "Left bend ahead",
+    "Narrow-Bridge-Or-Culvert-Ahead": "Narrow bridge or culvert ahead",
+    "Pedestrian-Crossing": "Pedestrian crossing ahead",
+    "Pedestrian-Crossing-Ahead": "Pedestrian crossing ahead",
+    "Right-Bend-Ahead": "Right bend ahead",
+    "T-Junction-Ahead": "T junction ahead",
+    "Traffic-From-Left-Merges-Ahead": "Traffic merges from the left ahead",
+    "Traffic-From-Right-Merges-Ahead": "Traffic merges from the right ahead",
+    "Level-Crossing-With-Gates": "Level crossing with gates ahead",
+    "Hospital": "Hospital ahead",
+    "No-Honking": "No honking sign ahead",
+    "No-Left-Turn": "No left turn",
+    "No-Right-Turn": "No right turn",
+    "No-U-Turn": "No U turn",
+}
 
 
 def calculate_iou(left: List[int], right: List[int]) -> float:
@@ -671,10 +696,16 @@ class ReportAlertPipeline:
             speed_match = SPEED_LIMIT.fullmatch(raw_label)
             if speed_match:
                 values["speed_limit_kmh"] = int(speed_match.group(1))
+                values["sign_message"] = (
+                    f"Speed limit {values['speed_limit_kmh']} detected"
+                )
                 return "Speed Limit", values
             canonical = "-".join(
                 raw_label.replace("_", " ").replace("-", " ").split()
             ).title()
+            values["sign_message"] = ROAD_SIGN_MESSAGES.get(
+                canonical, f"{values['label']} ahead"
+            )
             return canonical, values
         if detection.get("category") == "pothole":
             values.update(
@@ -733,6 +764,9 @@ class ReportAlertPipeline:
                 else "unavailable"
             ),
             "speed_limit_kmh": values.get("speed_limit_kmh", "unavailable"),
+            "sign_message": values.get(
+                "sign_message", f"{values.get('label', 'Road sign')} ahead"
+            ),
         }
         return {
             "rule_id": rule["id"],

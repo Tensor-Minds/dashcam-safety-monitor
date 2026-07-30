@@ -141,12 +141,12 @@ rules:
     severity: critical
     priority: 12
     temporal:
-      window_frames: 6
+      window_frames: 5
       minimum_hits: 4
-      maximum_misses: 2
+      maximum_misses: 1
     visual_duration_ms: 2000
     cooldown_ms: 5000
-    message: Pothole very close in the driving path
+    message: Warning - pothole very close in the driving path
     audio_key: pothole
     conditions:
       inside_ego_lane: true
@@ -160,12 +160,12 @@ rules:
     severity: warning
     priority: 11
     temporal:
-      window_frames: 6
-      minimum_hits: 4
+      window_frames: 20
+      minimum_hits: 15
       maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
-    message: Pothole ahead in the driving path
+    message: Warning - pothole ahead in the driving path
     audio_key: pothole
     conditions:
       inside_ego_lane: true
@@ -179,13 +179,184 @@ rules:
     severity: info
     priority: 10
     temporal:
-      window_frames: 6
-      minimum_hits: 4
+      window_frames: 20
+      minimum_hits: 15
       maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
     message: Pothole detected farther ahead in the driving path
-    audio_key: null
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: far
+
+  - id: alligator-crack-near
+    enabled: true
+    module: pothole
+    labels: [alligator_crack]
+    minimum_confidence: 0.40
+    severity: high
+    priority: 12
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Warning - alligator road cracking very close in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: near
+
+  - id: alligator-crack-medium
+    enabled: true
+    module: pothole
+    labels: [alligator_crack]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 11
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Alligator road cracking ahead in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: medium
+
+  - id: alligator-crack-far
+    enabled: true
+    module: pothole
+    labels: [alligator_crack]
+    minimum_confidence: 0.40
+    severity: info
+    priority: 10
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Alligator road cracking detected farther ahead
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: far
+
+  - id: longitudinal-crack-near
+    enabled: true
+    module: pothole
+    labels: [longitudinal_crack]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 12
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Warning - longitudinal road crack very close in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: near
+
+  - id: longitudinal-crack-medium
+    enabled: true
+    module: pothole
+    labels: [longitudinal_crack]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 11
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Longitudinal road crack ahead in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: medium
+
+  - id: longitudinal-crack-far
+    enabled: true
+    module: pothole
+    labels: [longitudinal_crack]
+    minimum_confidence: 0.40
+    severity: info
+    priority: 10
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Longitudinal road crack detected farther ahead
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: far
+
+  - id: transverse-crack-near
+    enabled: true
+    module: pothole
+    labels: [transverse_crack]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 12
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Warning - transverse road crack very close in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: near
+
+  - id: transverse-crack-medium
+    enabled: true
+    module: pothole
+    labels: [transverse_crack]
+    minimum_confidence: 0.40
+    severity: warning
+    priority: 11
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Transverse road crack ahead in the driving path
+    audio_key: pothole
+    conditions:
+      inside_ego_lane: true
+      relative_proximity: medium
+
+  - id: transverse-crack-far
+    enabled: true
+    module: pothole
+    labels: [transverse_crack]
+    minimum_confidence: 0.40
+    severity: info
+    priority: 10
+    temporal:
+      window_frames: 20
+      minimum_hits: 15
+      maximum_misses: 2
+    visual_duration_ms: 2000
+    cooldown_ms: 5000
+    message: Transverse road crack detected farther ahead
+    audio_key: pothole
     conditions:
       inside_ego_lane: true
       relative_proximity: far
@@ -273,7 +444,7 @@ rules:
       maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 10000
-    message: Road warning sign ahead - {label}
+    message: "{sign_message}"
     audio_key: road_sign
     conditions: {}
 
@@ -309,6 +480,6 @@ rules:
       maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 10000
-    message: Road sign detected - {label}
+    message: "{sign_message}"
     audio_key: road_sign
     conditions: {}
