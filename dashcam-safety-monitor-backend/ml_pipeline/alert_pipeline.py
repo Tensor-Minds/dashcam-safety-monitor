@@ -582,11 +582,17 @@ class ReportAlertPipeline:
         )
 
     def _fuse(
-        self, candidates: List[Dict[str, Any]], timestamp_ms: float
+        self,
+        candidates: List[Dict[str, Any]],
+        timestamp_ms: float,
+        persist_state: bool = True,
     ) -> Optional[Dict[str, Any]]:
         global_cooldown = self.rule_config.system["global_alert_cooldown_ms"]
         higher_priority_interrupt = False
-        if timestamp_ms - self.last_communication_ms < global_cooldown:
+        if (
+            persist_state
+            and timestamp_ms - self.last_communication_ms < global_cooldown
+        ):
             highest_incoming = (
                 max(
                     candidates,
@@ -637,18 +643,17 @@ class ReportAlertPipeline:
             else:
                 lower["suppressed_reason"] = "lower_numeric_priority"
             lower["suppressed_by_rule_id"] = primary["rule_id"]
-        primary["audio_trigger"] = bool(
-            primary.get("audio_key")
-            and (
-                timestamp_ms - self.last_audio_ms >= global_cooldown
-                or higher_priority_interrupt
-            )
+        primary["audio_trigger"] = bool(primary.get("audio_key")) and (
+            not persist_state
+            or timestamp_ms - self.last_audio_ms >= global_cooldown
+            or higher_priority_interrupt
         )
-        if primary["audio_trigger"]:
+        if persist_state and primary["audio_trigger"]:
             self.last_audio_ms = timestamp_ms
         primary["suppressed_alerts"] = candidates[1:]
-        self.last_communication_ms = timestamp_ms
-        self.last_primary = dict(primary)
+        if persist_state:
+            self.last_communication_ms = timestamp_ms
+            self.last_primary = dict(primary)
         return primary
 
     def _single_frame_primary(
@@ -680,7 +685,10 @@ class ReportAlertPipeline:
                             {"single_image_mode": True},
                         )
                     )
-        return self._fuse(candidates, timestamp_ms)
+        # Uploaded images are independent analyses. Video-only cooldown and
+        # visible-alert retention must not leak a previous image's alert into
+        # the current response.
+        return self._fuse(candidates, timestamp_ms, persist_state=False)
 
     def _rule_label_and_values(
         self,

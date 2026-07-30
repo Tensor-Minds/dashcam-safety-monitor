@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { ModelSelector } from "@/components/ModelSelector";
 import { MediaUploader } from "@/components/MediaUploader";
 import { Dashboard, ProcessedImageResult, ProcessedVideoResult } from "@/components/Dashboard";
@@ -21,6 +21,11 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isServerProcessingVideo, setIsServerProcessingVideo] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const imageRequestRef = useRef<{
+    id: number;
+    controller: AbortController;
+  } | null>(null);
+  const nextImageRequestId = useRef(0);
 
   const getApiHost = () => {
     if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
@@ -31,19 +36,34 @@ export default function Home() {
   };
 
   const processImageWithModels = async (file: File, models: string[]) => {
+    imageRequestRef.current?.controller.abort();
+
+    if (models.length === 0) {
+      imageRequestRef.current = null;
+      setImageResult(null);
+      setIsProcessing(false);
+      setErrorMsg("Select at least one YOLO model to run image analysis.");
+      return;
+    }
+
+    const request = {
+      id: ++nextImageRequestId.current,
+      controller: new AbortController()
+    };
+    imageRequestRef.current = request;
     setIsProcessing(true);
     setErrorMsg(null);
+
     try {
       const formData = new FormData();
       formData.append("file", file);
-      // Send models or default to all if empty
-      const modelsToSend = models.length > 0 ? models.join(",") : "anomaly,lane_line,pothole,road_sign";
-      formData.append("models", modelsToSend);
+      formData.append("models", models.join(","));
 
       const apiHost = getApiHost();
       const response = await fetch(`${apiHost}/api/process-image`, {
         method: "POST",
-        body: formData
+        body: formData,
+        signal: request.controller.signal
       });
 
       if (!response.ok) {
@@ -52,12 +72,22 @@ export default function Home() {
       }
 
       const data: ProcessedImageResult = await response.json();
-      setImageResult(data);
+      if (imageRequestRef.current?.id === request.id) {
+        setImageResult(data);
+      }
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
       console.error("Image processing error:", err);
-      setErrorMsg(err instanceof Error ? err.message : `Could not connect to FastAPI backend server at ${getApiHost()}`);
+      if (imageRequestRef.current?.id === request.id) {
+        setErrorMsg(err instanceof Error ? err.message : `Could not connect to FastAPI backend server at ${getApiHost()}`);
+      }
     } finally {
-      setIsProcessing(false);
+      if (imageRequestRef.current?.id === request.id) {
+        imageRequestRef.current = null;
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -85,14 +115,17 @@ export default function Home() {
     simulatedSpeedKmh: number
   ) => {
     if (!mediaFile || mediaType !== "video") return;
+    if (selectedModels.length === 0) {
+      setErrorMsg("Select at least one YOLO model to run video analysis.");
+      return;
+    }
     setIsServerProcessingVideo(true);
     setErrorMsg(null);
 
     try {
       const formData = new FormData();
       formData.append("file", mediaFile);
-      const modelsToSend = selectedModels.length > 0 ? selectedModels.join(",") : "anomaly,lane_line,pothole,road_sign";
-      formData.append("models", modelsToSend);
+      formData.append("models", selectedModels.join(","));
       formData.append("turn_signal", turnSignal);
       formData.append("simulated_vehicle_speed_kmh", String(simulatedSpeedKmh));
 
@@ -118,6 +151,8 @@ export default function Home() {
   };
 
   const handleReset = () => {
+    imageRequestRef.current?.controller.abort();
+    imageRequestRef.current = null;
     setMediaFile(null);
     setMediaType(null);
     setImageResult(null);

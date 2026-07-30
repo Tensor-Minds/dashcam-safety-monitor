@@ -9,3 +9,13 @@ braking, throttle, or vehicle movement.
 
 ## Architecture
 ![Architecture Diagram](./docs/architecture.png)
+
+## Run Application using docker
+```bash
+docker compose up --build -d
+```
+
+## Stop Application
+```bash
+docker compose down -v
+```
