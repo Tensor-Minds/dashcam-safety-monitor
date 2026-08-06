@@ -4,9 +4,9 @@ import numpy as np
 from typing import List, Dict, Any
 from ultralytics import YOLO
 
-# Configurable via .env or hardcoded fallbacks (default: 0.15)
-DEFAULT_MODEL_CONF = float(os.getenv("CONF_ANOMALY", os.getenv("DEFAULT_MODEL_CONFIDENCE", "0.15")))
-DEFAULT_DET_CONF = float(os.getenv("DET_CONF_ANOMALY", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15")))
+# Configurable via rules.yml (default: 0.15)
+DEFAULT_MODEL_CONF = 0.15
+DEFAULT_DET_CONF = 0.15
 
 # Exact classes from ml_pipeline/weights/road-anomaly/Readme.md
 ANOMALY_CLASSES = {

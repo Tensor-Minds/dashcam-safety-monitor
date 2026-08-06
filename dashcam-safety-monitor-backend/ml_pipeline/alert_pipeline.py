@@ -100,12 +100,7 @@ class ReportAlertPipeline:
         self.blur_threshold = self._configured_blur_threshold()
 
     def _configured_blur_threshold(self) -> float:
-        return float(
-            os.getenv(
-                "IMAGE_QUALITY_BLUR_THRESHOLD",
-                str(self.rule_config.system["minimum_blur_score"]),
-            )
-        )
+        return float(self.rule_config.system["minimum_blur_score"])
 
     def update_rule_config(self, rule_config: RuleConfiguration) -> None:
         self.rule_config = rule_config

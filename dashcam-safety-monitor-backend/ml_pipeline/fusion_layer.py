@@ -119,21 +119,32 @@ class FusionManager:
         self.last_image_quality = None
 
     def _apply_model_rule_settings(self):
+        road_sign_cfg = self.rule_config.data["road_sign_filter"]
         road_sign = self.detectors.get("road_sign")
         if road_sign:
-            road_sign.nms_iou = self.rule_config.data["road_sign_filter"][
-                "nms_iou_threshold"
-            ]
+            road_sign.nms_iou = road_sign_cfg["nms_iou_threshold"]
+            road_sign.model_conf = road_sign_cfg["minimum_confidence"]
+            road_sign.det_conf = road_sign_cfg["minimum_confidence"]
+
+        pothole_cfg = self.rule_config.data["pothole_filter"]
         pothole = self.detectors.get("pothole")
         if pothole:
-            pothole.nms_iou = self.rule_config.data["pothole_filter"][
-                "nms_iou_threshold"
-            ]
+            pothole.nms_iou = pothole_cfg["nms_iou_threshold"]
+            pothole.model_conf = pothole_cfg["minimum_confidence"]
+            pothole.det_conf = pothole_cfg["minimum_confidence"]
+
+        anomaly_cfg = self.rule_config.data["anomaly_filter"]
         anomaly = self.detectors.get("anomaly")
         if anomaly:
-            anomaly.nms_iou = self.rule_config.data["anomaly_filter"][
-                "nms_iou_threshold"
-            ]
+            anomaly.nms_iou = anomaly_cfg["nms_iou_threshold"]
+            anomaly.model_conf = anomaly_cfg["minimum_confidence"]
+            anomaly.det_conf = anomaly_cfg["minimum_confidence"]
+
+        lane_cfg = self.rule_config.data["lane"]
+        lane_line = self.detectors.get("lane_line")
+        if lane_line:
+            lane_line.model_conf = lane_cfg["minimum_confidence"]
+            lane_line.det_conf = lane_cfg["minimum_confidence"]
 
     def replace_rules(self, data: Dict[str, Any]):
         self.rule_config.replace(data)
