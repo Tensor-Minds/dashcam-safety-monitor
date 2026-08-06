@@ -4,43 +4,42 @@ priority_policy: higher_number_wins
 # Demonstration defaults derived from the interim proposal. These thresholds are
 # configurable and are not claimed to be scientifically validated.
 system:
-  processing_target_fps: 10
-  tracking_iou_threshold: 0.30
-  duplicate_iou_threshold: 0.50
-  visual_duration_ms: 2000
-  global_alert_cooldown_ms: 5000
-  maximum_track_misses: 2
-  minimum_blur_score: 80
-  minimum_mean_brightness: 25
-  maximum_mean_brightness: 235
-  image_quality_status_cooldown_ms: 10000
+  processing_target_fps: 10  # Target frame processing rate per second for performance scaling
+  tracking_iou_threshold: 0.30  # Minimum IOU overlap to associate detections across consecutive frames
+  duplicate_iou_threshold: 0.50  # Overlap threshold to merge/suppress duplicate bounding boxes
+  visual_duration_ms: 2000  # Default duration (in ms) an alert remains visible on screen
+  maximum_track_misses: 2  # Max consecutive frames a tracked object can be missed before dropping track
+  minimum_blur_score: 80  # Laplacian variance threshold below which frame is flagged as blurry
+  minimum_mean_brightness: 25  # Minimum mean pixel intensity threshold (0-255) for underexposed frame check
+  maximum_mean_brightness: 235  # Maximum mean pixel intensity threshold (0-255) for overexposed frame check
+  image_quality_status_cooldown_ms: 10000  # Cooldown period (in ms) between repeating image quality status alerts
 
 road_sign_filter:
-  minimum_confidence: 0.60
-  nms_iou_threshold: 0.45
-  minimum_aspect_ratio: 0.50
-  maximum_aspect_ratio: 1.50
-  minimum_frame_area_ratio: 0.005
+  minimum_confidence: 0.60  # Minimum model confidence score required for road sign detections
+  nms_iou_threshold: 0.45  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping sign boxes
+  minimum_aspect_ratio: 0.50  # Minimum width-to-height aspect ratio filter for valid road signs
+  maximum_aspect_ratio: 1.50  # Maximum width-to-height aspect ratio filter for valid road signs
+  minimum_frame_area_ratio: 0.005  # Minimum bounding box area relative to frame size to filter distant noise
 
 pothole_filter:
-  minimum_confidence: 0.40
-  nms_iou_threshold: 0.40
-  medium_bottom_y_ratio: 0.50
-  near_bottom_y_ratio: 0.70
-  # Used only when two usable lane boundaries cannot be derived.
-  fallback_roi_left_ratio: 0.25
-  fallback_roi_right_ratio: 0.75
-  fallback_roi_minimum_bottom_y_ratio: 0.35
+  minimum_confidence: 0.40  # Minimum model confidence score required for pothole detections
+  nms_iou_threshold: 0.40  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping pothole boxes
+  medium_bottom_y_ratio: 0.50  # Normalized frame Y threshold separating medium-distance potholes
+  near_bottom_y_ratio: 0.70  # Normalized frame Y threshold separating near-distance potholes
+  fallback_roi_left_ratio: 0.25  # Left boundary ratio of ROI box when calculating fallback pothole placement
+  fallback_roi_right_ratio: 0.75  # Right boundary ratio of ROI box when calculating fallback pothole placement
+  fallback_roi_minimum_bottom_y_ratio: 0.35  # Minimum bottom Y boundary ratio for fallback ROI filtering
 
 anomaly_filter:
-  minimum_confidence: 0.55
+  minimum_confidence: 0.55  # Minimum model confidence score required for anomaly detections
+  nms_iou_threshold: 0.40  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping anomaly boxes
 
 lane:
-  minimum_confidence: 0.50
-  ema_alpha: 0.70
-  trigger_offset_ratio: 0.35
-  clear_offset_ratio: 0.20
-  minimum_duration_ms: 1500
+  minimum_confidence: 0.50  # Minimum model confidence score required for lane line detections
+  ema_alpha: 0.70  # Exponential Moving Average (EMA) smoothing factor for lane offset tracking
+  trigger_offset_ratio: 0.35  # Offset threshold ratio from lane center required to trigger lane departure alert
+  clear_offset_ratio: 0.20  # Offset threshold ratio below which lane departure alert state clears
+  minimum_duration_ms: 1500  # Minimum continuous departure duration (in ms) required before triggering alert
 
 # Priority is intentionally limited to 0..number_of_rules. The largest active
 # number wins, preserving proposal order:

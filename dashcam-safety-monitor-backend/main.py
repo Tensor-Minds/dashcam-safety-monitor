@@ -80,24 +80,25 @@ fusion_manager = FusionManager()
 
 @app.get("/")
 def read_root():
+    cfg_data = fusion_manager.rule_config.data
     return {
         "status": "online",
         "service": "Dashcam Road Safety Monitor API",
         "available_models": ["road_sign", "pothole", "lane_line", "anomaly"],
         "model_confidence_thresholds": {
-            "road_sign": float(os.getenv("CONF_ROAD_SIGN", os.getenv("DEFAULT_MODEL_CONFIDENCE", "0.15"))),
-            "pothole": float(os.getenv("CONF_POTHOLE", os.getenv("DEFAULT_MODEL_CONFIDENCE", "0.15"))),
-            "anomaly": float(os.getenv("CONF_ANOMALY", os.getenv("DEFAULT_MODEL_CONFIDENCE", "0.15"))),
-            "lane_line": float(os.getenv("CONF_LANE_LINE", os.getenv("DEFAULT_MODEL_CONFIDENCE", "0.15")))
+            "road_sign": cfg_data["road_sign_filter"]["minimum_confidence"],
+            "pothole": cfg_data["pothole_filter"]["minimum_confidence"],
+            "anomaly": cfg_data["anomaly_filter"]["minimum_confidence"],
+            "lane_line": cfg_data["lane"]["minimum_confidence"],
         },
         "detection_confidence_thresholds": {
-            "road_sign": float(os.getenv("DET_CONF_ROAD_SIGN", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15"))),
-            "pothole": float(os.getenv("DET_CONF_POTHOLE", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15"))),
-            "anomaly": float(os.getenv("DET_CONF_ANOMALY", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15"))),
-            "lane_line": float(os.getenv("DET_CONF_LANE_LINE", os.getenv("DEFAULT_DETECTION_CONFIDENCE", "0.15")))
+            "road_sign": cfg_data["road_sign_filter"]["minimum_confidence"],
+            "pothole": cfg_data["pothole_filter"]["minimum_confidence"],
+            "anomaly": cfg_data["anomaly_filter"]["minimum_confidence"],
+            "lane_line": cfg_data["lane"]["minimum_confidence"],
         },
-        "rule_version": fusion_manager.rule_config.data["version"],
-        "priority_policy": fusion_manager.rule_config.data["priority_policy"],
+        "rule_version": cfg_data["version"],
+        "priority_policy": cfg_data["priority_policy"],
         "configured_rule_count": len(fusion_manager.rule_config.rules),
     }
 

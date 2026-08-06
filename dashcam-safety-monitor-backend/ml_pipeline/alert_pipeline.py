@@ -100,12 +100,7 @@ class ReportAlertPipeline:
         self.blur_threshold = self._configured_blur_threshold()
 
     def _configured_blur_threshold(self) -> float:
-        return float(
-            os.getenv(
-                "IMAGE_QUALITY_BLUR_THRESHOLD",
-                str(self.rule_config.system["minimum_blur_score"]),
-            )
-        )
+        return float(self.rule_config.system["minimum_blur_score"])
 
     def update_rule_config(self, rule_config: RuleConfiguration) -> None:
         self.rule_config = rule_config
@@ -587,41 +582,27 @@ class ReportAlertPipeline:
         timestamp_ms: float,
         persist_state: bool = True,
     ) -> Optional[Dict[str, Any]]:
-        global_cooldown = self.rule_config.system["global_alert_cooldown_ms"]
         higher_priority_interrupt = False
         if (
             persist_state
-            and timestamp_ms - self.last_communication_ms < global_cooldown
+            and self.last_primary
+            and candidates
         ):
-            highest_incoming = (
-                max(
-                    candidates,
-                    key=lambda alert: (
-                        alert["priority"],
-                        alert.get("confidence", 0),
-                    ),
-                )
-                if candidates
-                else None
+            highest_incoming = max(
+                candidates,
+                key=lambda alert: (
+                    alert["priority"],
+                    alert.get("confidence", 0),
+                ),
             )
             higher_priority_interrupt = bool(
-                highest_incoming
-                and self.last_primary
-                and highest_incoming["priority"] > self.last_primary["priority"]
+                highest_incoming["priority"] > self.last_primary["priority"]
             )
-            if higher_priority_interrupt:
-                candidates = [highest_incoming] + [
-                    candidate
-                    for candidate in candidates
-                    if candidate is not highest_incoming
-                ]
-            elif self.last_primary and self.last_primary["visible_until_ms"] >= timestamp_ms:
+        if not candidates:
+            if persist_state and self.last_primary and self.last_primary["visible_until_ms"] >= timestamp_ms:
                 retained = dict(self.last_primary)
                 retained["audio_trigger"] = False
                 return retained
-            elif not higher_priority_interrupt:
-                return None
-        if not candidates:
             return None
         candidates.sort(
             key=lambda alert: (
@@ -643,9 +624,10 @@ class ReportAlertPipeline:
             else:
                 lower["suppressed_reason"] = "lower_numeric_priority"
             lower["suppressed_by_rule_id"] = primary["rule_id"]
+        rule_cooldown = primary.get("cooldown_ms", 5000)
         primary["audio_trigger"] = bool(primary.get("audio_key")) and (
             not persist_state
-            or timestamp_ms - self.last_audio_ms >= global_cooldown
+            or timestamp_ms - self.last_audio_ms >= rule_cooldown
             or higher_priority_interrupt
         )
         if persist_state and primary["audio_trigger"]:
