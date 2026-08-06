@@ -106,7 +106,6 @@ class RuleConfiguration:
                 "tracking_iou_threshold",
                 "duplicate_iou_threshold",
                 "visual_duration_ms",
-                "global_alert_cooldown_ms",
                 "maximum_track_misses",
                 "minimum_blur_score",
                 "minimum_mean_brightness",
@@ -129,7 +128,7 @@ class RuleConfiguration:
                 "fallback_roi_right_ratio",
                 "fallback_roi_minimum_bottom_y_ratio",
             },
-            "anomaly_filter": {"minimum_confidence"},
+            "anomaly_filter": {"minimum_confidence", "nms_iou_threshold"},
             "lane": {
                 "minimum_confidence",
                 "ema_alpha",

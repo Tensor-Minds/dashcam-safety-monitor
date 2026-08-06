@@ -129,6 +129,11 @@ class FusionManager:
             pothole.nms_iou = self.rule_config.data["pothole_filter"][
                 "nms_iou_threshold"
             ]
+        anomaly = self.detectors.get("anomaly")
+        if anomaly:
+            anomaly.nms_iou = self.rule_config.data["anomaly_filter"][
+                "nms_iou_threshold"
+            ]
 
     def replace_rules(self, data: Dict[str, Any]):
         self.rule_config.replace(data)
