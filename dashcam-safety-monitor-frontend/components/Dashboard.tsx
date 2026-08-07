@@ -13,11 +13,9 @@ import {
   AlertTriangle,
   Radio,
   List,
-  Filter,
   Flame,
   FileVideo,
   Download,
-  Eye,
   Zap,
   CheckCircle2,
   Sparkles,
@@ -144,16 +142,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onRunServerVideoProcess,
   isServerProcessingVideo = false
 }) => {
-  // Sound controls
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [speechEnabled, setSpeechEnabled] = useState(true);
+  const [audioWarningsEnabled, setAudioWarningsEnabled] = useState(true);
   const [turnSignal, setTurnSignal] = useState<"off" | "left" | "right">("off");
   const [simulatedSpeedKmh, setSimulatedSpeedKmh] = useState(50);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioWarningsEnabledRef = useRef(true);
+  const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioUnlockConfirmedRef = useRef(false);
   const lastAudioTriggerRef = useRef<number>(0);
   const lastAudioPriorityRef = useRef<number>(0);
-  const soundEnabledRef = useRef(true);
-  const speechEnabledRef = useRef(true);
 
   // Video Streaming State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -161,12 +158,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [wsErrorDetail, setWsErrorDetail] = useState<string | null>(null);
   const [liveDetections, setLiveDetections] = useState<Detection[]>([]);
   const [liveFrameSize, setLiveFrameSize] = useState({ width: 640, height: 360 });
-  const [showOverlay, setShowOverlay] = useState<boolean>(true);
 
-  // Alert Feed State & Priority Filter
-  const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
+  // Alert feed state
   const [alertsFeed, setAlertsFeed] = useState<
-    { id: string; timestamp: string; priority: string; priorityRank: number; detections: Detection[]; audioTrigger: boolean }[]
+    { id: string; timestamp: string; priority: string; detections: Detection[] }[]
   >([]);
   const [currentPriority, setCurrentPriority] = useState<string>("normal");
   const [currentPrimaryAlert, setCurrentPrimaryAlert] = useState<PrimaryAlert | null>(null);
@@ -207,25 +202,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [isServerProcessingVideo]);
 
-  // Audio is generated locally and only enabled after an explicit user action.
-  useEffect(() => {
-    soundEnabledRef.current = soundEnabled;
-  }, [soundEnabled]);
-
-  useEffect(() => {
-    speechEnabledRef.current = speechEnabled;
-  }, [speechEnabled]);
-
   useEffect(() => {
     return () => {
       audioContextRef.current?.close();
       audioContextRef.current = null;
       window.speechSynthesis?.cancel();
+      speechUtteranceRef.current = null;
     };
   }, []);
 
   const ensureAudioReady = () => {
-    if (!soundEnabledRef.current) return;
     if (!audioContextRef.current) {
       audioContextRef.current = new AudioContext();
     }
@@ -234,12 +220,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  const speakWarning = (message: string) => {
+    if (
+      !audioWarningsEnabledRef.current
+      || !("speechSynthesis" in window)
+      || !("SpeechSynthesisUtterance" in window)
+    ) {
+      return;
+    }
+
+    const synthesizer = window.speechSynthesis;
+    synthesizer.cancel();
+    synthesizer.resume();
+
+    const utterance = new SpeechSynthesisUtterance(message);
+    const preferredVoice = synthesizer
+      .getVoices()
+      .find((voice) => voice.lang.toLowerCase().startsWith("en"));
+    if (preferredVoice) utterance.voice = preferredVoice;
+    utterance.lang = preferredVoice?.lang || "en-US";
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    utterance.onend = () => {
+      speechUtteranceRef.current = null;
+    };
+    utterance.onerror = () => {
+      speechUtteranceRef.current = null;
+    };
+    speechUtteranceRef.current = utterance;
+    synthesizer.speak(utterance);
+  };
+
   const playAlertSound = (
     audioKey: string = "road_sign",
     spokenMessage?: string,
     priority: number = 0
   ) => {
-    if (!soundEnabledRef.current) return;
+    if (!audioWarningsEnabledRef.current) return;
+    ensureAudioReady();
     const now = Date.now();
     const higherPriorityInterrupt = priority > lastAudioPriorityRef.current;
     if (now - lastAudioTriggerRef.current > 5000 || higherPriorityInterrupt) {
@@ -264,20 +283,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
           oscillator.stop(start + 0.14);
         });
       }
-      if (
-        speechEnabledRef.current
-        && spokenMessage
-        && "speechSynthesis" in window
-        && "SpeechSynthesisUtterance" in window
-      ) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(spokenMessage);
-        utterance.lang = "en-US";
-        utterance.rate = 0.95;
-        utterance.pitch = 1;
-        utterance.volume = 1;
-        window.speechSynthesis.speak(utterance);
+      if (spokenMessage) speakWarning(spokenMessage);
+    }
+  };
+
+  const toggleAudioWarnings = () => {
+    const enabled = !audioWarningsEnabledRef.current;
+    audioWarningsEnabledRef.current = enabled;
+    setAudioWarningsEnabled(enabled);
+
+    if (enabled) {
+      lastAudioTriggerRef.current = 0;
+      lastAudioPriorityRef.current = 0;
+      ensureAudioReady();
+      const activeAlert = currentPrimaryAlert || imageResult?.primary_alert;
+      if (activeAlert) {
+        playAlertSound(
+          activeAlert.audio_key || activeAlert.category,
+          activeAlert.message,
+          activeAlert.priority
+        );
+      } else {
+        playAlertSound("road_sign", "Audio warnings enabled");
       }
+      audioUnlockConfirmedRef.current = true;
+    } else {
+      window.speechSynthesis?.cancel();
+      speechUtteranceRef.current = null;
+      audioUnlockConfirmedRef.current = false;
+      void audioContextRef.current?.suspend();
     }
   };
 
@@ -354,14 +388,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             const now = Date.now();
             if (data.detections && data.detections.length > 0 && now - lastAlertFeedUpdateRef.current > 350) {
               lastAlertFeedUpdateRef.current = now;
-              const pRank = data.highest_priority === "anomaly" ? 1 : data.highest_priority === "pothole" ? 2 : data.highest_priority === "lane_line" ? 3 : 4;
               const newAlert = {
                 id: `${now}-${Math.random()}`,
                 timestamp: new Date().toLocaleTimeString(),
                 priority: data.highest_priority,
-                priorityRank: pRank,
-                detections: data.detections,
-                audioTrigger: data.audio_trigger
+                detections: data.detections
               };
               setAlertsFeed((prev) => [newAlert, ...prev.slice(0, 19)]);
             }
@@ -486,6 +517,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (e) e.stopPropagation();
     if (!videoRef.current) return;
     ensureAudioReady();
+    if (
+      audioWarningsEnabledRef.current
+      && !audioUnlockConfirmedRef.current
+    ) {
+      speakWarning("Audio warnings enabled");
+      audioUnlockConfirmedRef.current = true;
+    }
 
     if (wsStatus !== "connected") {
       connectWebSocket();
@@ -551,11 +589,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         return <span className="px-3 py-1 rounded-md text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">NORMAL DRIVING</span>;
     }
   };
-
-  const filteredAlerts = alertsFeed.filter((a) => {
-    if (priorityFilter === "ALL") return true;
-    return a.priority.toUpperCase() === priorityFilter.toUpperCase();
-  });
 
   const apiProtocol =
     typeof window !== "undefined" ? window.location.protocol : "http:";
@@ -681,25 +714,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </p>
             </div>
 
-            {/* Live Metrics & Timer Bar */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-2xl flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 block font-semibold">Elapsed Time</span>
-                  <span className="text-lg font-extrabold text-indigo-400 font-mono">
-                    {formatTimer(elapsedSeconds)}
-                  </span>
-                </div>
-                <Clock className="w-5 h-5 text-indigo-400 opacity-60" />
+            {/* Live processing timer */}
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-2xl flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-slate-400 block font-semibold">Elapsed Time</span>
+                <span className="text-lg font-extrabold text-indigo-400 font-mono">
+                  {formatTimer(elapsedSeconds)}
+                </span>
               </div>
-
-              <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-2xl flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 block font-semibold">Engine Speed</span>
-                  <span className="text-xs font-bold text-emerald-400">Stride 3 (Fast)</span>
-                </div>
-                <Zap className="w-5 h-5 text-emerald-400 opacity-60" />
-              </div>
+              <Clock className="w-5 h-5 text-indigo-400 opacity-60" />
             </div>
 
             {/* Step-by-Step Live Processing Checklist */}
@@ -757,45 +780,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              const nextEnabled = !soundEnabled;
-              soundEnabledRef.current = nextEnabled;
-              setSoundEnabled(nextEnabled);
-              if (nextEnabled) {
-                ensureAudioReady();
-              } else {
-                window.speechSynthesis?.cancel();
-              }
-            }}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${soundEnabled
-              ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40 hover:bg-indigo-600/30"
-              : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
-              }`}
-          >
-            {soundEnabled ? <Volume2 className="w-4 h-4 text-indigo-400" /> : <VolumeX className="w-4 h-4" />}
-            <span>{soundEnabled ? "Alert audio enabled" : "Enable alert audio"}</span>
-          </button>
-
-          <button
             type="button"
-            disabled={!soundEnabled}
-            onClick={() => {
-              speechEnabledRef.current = !speechEnabled;
-              setSpeechEnabled(!speechEnabled);
-              if (speechEnabled) {
-                window.speechSynthesis?.cancel();
-              }
-            }}
+            onClick={toggleAudioWarnings}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
-              !soundEnabled
-                ? "bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed"
-                : speechEnabled
-                  ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-600/30"
-                  : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
+              audioWarningsEnabled
+                ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40 hover:bg-indigo-600/30"
+                : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
             }`}
           >
-            <Radio className="w-4 h-4" />
-            <span>{speechEnabled ? "Spoken warnings on" : "Spoken warnings off"}</span>
+            {audioWarningsEnabled ? (
+              <Volume2 className="w-4 h-4 text-indigo-400" />
+            ) : (
+              <VolumeX className="w-4 h-4" />
+            )}
+            <span>
+              {audioWarningsEnabled
+                ? "Audio warnings enabled"
+                : "Enable audio warnings"}
+            </span>
           </button>
 
           <label className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs bg-slate-800 border border-slate-700 text-slate-300">
@@ -1061,16 +1063,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </h3>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setShowOverlay(!showOverlay)}
-                      className="flex items-center gap-1 px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>{showOverlay ? "YOLO BBox Overlay ON" : "Overlay OFF"}</span>
-                    </button>
-                    {getPriorityBadge(currentPriority)}
-                  </div>
+                  {getPriorityBadge(currentPriority)}
                 </div>
 
                 {wsErrorDetail && (
@@ -1101,7 +1094,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     className="w-full max-h-[460px] object-contain block"
                   />
 
-                  {showOverlay && liveDetections.length > 0 && (
+                  {liveDetections.length > 0 && (
                     <svg
                       viewBox={`0 0 ${liveFrameSize.width} ${liveFrameSize.height}`}
                       preserveAspectRatio="xMidYMid meet"
@@ -1173,22 +1166,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <List className="w-4 h-4 text-indigo-400" /> Prioritized Hazard Feed Log
                 </h3>
-
-                {/* Priority Filter dropdown */}
-                <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-1">
-                  <Filter className="w-3.5 h-3.5 text-slate-400 ml-1" />
-                  <select
-                    value={priorityFilter}
-                    onChange={(e) => setPriorityFilter(e.target.value)}
-                    className="bg-transparent text-xs text-slate-200 outline-none pr-2 cursor-pointer font-semibold"
-                  >
-                    <option value="ALL" className="bg-slate-900 text-white">All Priorities</option>
-                    <option value="ANOMALY" className="bg-slate-900 text-red-400">P1: Critical</option>
-                    <option value="LANE_LINE" className="bg-slate-900 text-cyan-400">P2: Lane departure</option>
-                    <option value="POTHOLE" className="bg-slate-900 text-orange-400">P3: Pothole</option>
-                    <option value="ROAD_SIGN" className="bg-slate-900 text-yellow-400">P4: Low</option>
-                  </select>
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 mb-4">
@@ -1225,12 +1202,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       ))}
                     </div>
                   ))
-                ) : filteredAlerts.length === 0 ? (
+                ) : alertsFeed.length === 0 ? (
                   <p className="text-xs text-slate-400 italic text-center py-8">
                     Stream video or run server video analysis to populate live priority feed...
                   </p>
                 ) : (
-                  filteredAlerts.map((alert) => (
+                  alertsFeed.map((alert) => (
                     <div
                       key={alert.id}
                       className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-1.5"
