@@ -87,7 +87,7 @@ class RoadSignDetector:
             try:
                 # 1. YOLO Model Inference Confidence Threshold
                 results = self.model(
-                    frame, conf=model_conf_to_use, iou=self.nms_iou, verbose=False
+                    frame, conf=model_conf_to_use, iou=self.nms_iou, imgsz=640, verbose=False
                 )[0]
                 for box in results.boxes:
                     cls_id = int(box.cls[0].item())

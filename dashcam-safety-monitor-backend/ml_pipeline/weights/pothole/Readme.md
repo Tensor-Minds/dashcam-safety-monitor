@@ -1,9 +1,10 @@
 # Pothole detection
 
 Yolo model type: Yolov8s
+Weights file: best.pt
 
 Classes:
-0: alligator_crack
-1: longitudinal_crack
-2: Pothole
-3: transverse_crack
+0: longitudinal_crack
+1: transverse_crack
+2: alligator_crack
+3: Pothole

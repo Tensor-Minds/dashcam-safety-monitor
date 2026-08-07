@@ -9,19 +9,19 @@ from ultralytics import YOLO
 DEFAULT_MODEL_CONF = 0.15
 DEFAULT_DET_CONF = 0.15
 
-# Exact classes from ml_pipeline/weights/pothole/Readme.md
+# Exact classes from ml_pipeline/weights/pothole/best.pt model metadata
 POTHOLE_CLASSES = {
-    0: "alligator_crack",
-    1: "longitudinal_crack",
-    2: "Pothole",
-    3: "transverse_crack"
+    0: "longitudinal_crack",
+    1: "transverse_crack",
+    2: "alligator_crack",
+    3: "Pothole"
 }
 
 class PotholeDetector:
     """
     Pothole & Road Surface Damage Detection Module.
-    Weights file: ml_pipeline/weights/pothole/yolov8s-350-epoch-coslrtrue.pt
-    Detects ONLY the 4 classes specified in weights/pothole/Readme.md
+    Weights file: ml_pipeline/weights/pothole/best.pt
+    Detects ONLY the 4 classes specified in model metadata
     """
 
     def __init__(self, weights_path: str = None, model_conf: float = None, det_conf: float = None):
@@ -31,7 +31,7 @@ class PotholeDetector:
 
         if weights_path is None:
             weights_dir = os.path.join(
-                os.path.dirname(__file__), "..", "weights", "pothole", "yolov8s-350-epoch-coslrtrue.pt"
+                os.path.dirname(__file__), "..", "weights", "pothole", "best.pt"
             )
             weights_path = os.path.abspath(weights_dir)
 
@@ -65,7 +65,7 @@ class PotholeDetector:
             try:
                 # 1. YOLO Model Inference Confidence Threshold
                 results = self.model(
-                    frame, conf=model_conf_to_use, iou=self.nms_iou, verbose=False
+                    frame, conf=model_conf_to_use, iou=self.nms_iou, imgsz=640, verbose=False
                 )[0]
                 for box in results.boxes:
                     cls_id = int(box.cls[0].item())

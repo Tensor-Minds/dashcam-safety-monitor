@@ -239,33 +239,14 @@ async def process_video(
                 break
 
             timestamp_ms = frame_idx / fps * 1000
-            if frame_idx % sample_stride == 0:
-                annotated_frame, detections, highest_priority, audio_trigger = fusion_manager.process_frame(
-                    frame=frame,
-                    active_models=active_models_list,
-                    is_video=True,
-                    timestamp_ms=timestamp_ms,
-                    turn_signal=turn_signal,
-                    vehicle_speed_kmh=simulated_vehicle_speed_kmh,
-                )
-                latest_detections = detections
-                latest_primary_alert = fusion_manager.last_primary_alert
-            else:
-                visible_alert = (
-                    latest_primary_alert
-                    if latest_primary_alert
-                    and latest_primary_alert.get("visible_until_ms", 0) >= timestamp_ms
-                    else None
-                )
-                annotated_frame = fusion_manager.render_annotations(
-                    frame,
-                    latest_detections,
-                    visible_alert,
-                    fusion_manager.last_image_quality,
-                )
-                detections = []
-                highest_priority = visible_alert["category"] if visible_alert else "normal"
-                audio_trigger = False
+            annotated_frame, detections, highest_priority, audio_trigger = fusion_manager.process_frame(
+                frame=frame,
+                active_models=active_models_list,
+                is_video=True,
+                timestamp_ms=timestamp_ms,
+                turn_signal=turn_signal,
+                vehicle_speed_kmh=simulated_vehicle_speed_kmh,
+            )
 
             if writer:
                 writer.write(annotated_frame)
@@ -282,7 +263,7 @@ async def process_video(
                     overall_highest_rank = rank
                     overall_highest_priority = cat
 
-            if frame_idx % sample_stride == 0 and (detections or frame_idx % (sample_stride * 5) == 0):
+            if detections or frame_idx % 10 == 0:
                 timestamp = frame_idx / fps
                 _, buffer = cv2.imencode(".jpg", annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
                 out_b64 = base64.b64encode(buffer).decode("utf-8")

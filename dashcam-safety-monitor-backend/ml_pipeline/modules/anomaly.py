@@ -57,7 +57,7 @@ class AnomalyDetector:
         if self.initialized and self.model is not None:
             try:
                 # 1. YOLO Model Inference Confidence & NMS IOU Threshold
-                results = self.model(frame, conf=model_conf_to_use, iou=self.nms_iou, verbose=False)[0]
+                results = self.model(frame, conf=model_conf_to_use, iou=self.nms_iou, imgsz=640, verbose=False)[0]
                 for box in results.boxes:
                     cls_id = int(box.cls[0].item())
                     conf = float(box.conf[0].item())

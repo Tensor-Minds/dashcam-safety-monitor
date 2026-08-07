@@ -15,14 +15,14 @@ system:
   image_quality_status_cooldown_ms: 10000  # Cooldown period (in ms) between repeating image quality status alerts
 
 road_sign_filter:
-  minimum_confidence: 0.60  # Minimum model confidence score required for road sign detections
+  minimum_confidence: 0.15  # Minimum model confidence score required for road sign detections
   nms_iou_threshold: 0.45  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping sign boxes
   minimum_aspect_ratio: 0.50  # Minimum width-to-height aspect ratio filter for valid road signs
   maximum_aspect_ratio: 1.50  # Maximum width-to-height aspect ratio filter for valid road signs
   minimum_frame_area_ratio: 0.005  # Minimum bounding box area relative to frame size to filter distant noise
 
 pothole_filter:
-  minimum_confidence: 0.40  # Minimum model confidence score required for pothole detections
+  minimum_confidence: 0.15  # Minimum model confidence score required for pothole detections
   nms_iou_threshold: 0.40  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping pothole boxes
   medium_bottom_y_ratio: 0.50  # Normalized frame Y threshold separating medium-distance potholes
   near_bottom_y_ratio: 0.70  # Normalized frame Y threshold separating near-distance potholes
@@ -31,11 +31,11 @@ pothole_filter:
   fallback_roi_minimum_bottom_y_ratio: 0.35  # Minimum bottom Y boundary ratio for fallback ROI filtering
 
 anomaly_filter:
-  minimum_confidence: 0.55  # Minimum model confidence score required for anomaly detections
+  minimum_confidence: 0.15  # Minimum model confidence score required for anomaly detections
   nms_iou_threshold: 0.40  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping anomaly boxes
 
 lane:
-  minimum_confidence: 0.50  # Minimum model confidence score required for lane line detections
+  minimum_confidence: 0.15  # Minimum model confidence score required for lane line detections
   ema_alpha: 0.70  # Exponential Moving Average (EMA) smoothing factor for lane offset tracking
   trigger_offset_ratio: 0.35  # Offset threshold ratio from lane center required to trigger lane departure alert
   clear_offset_ratio: 0.20  # Offset threshold ratio below which lane departure alert state clears

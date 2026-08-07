@@ -296,11 +296,16 @@ class FusionManager:
         
         parsed_active = set()
         for m in active_models:
-            m_clean = m.lower().strip()
+            m_clean = str(m).lower().strip()
             if m_clean in MODEL_ALIAS_MAP:
                 parsed_active.add(MODEL_ALIAS_MAP[m_clean])
+            elif m_clean in {"anomaly", "lane_line", "pothole", "road_sign"}:
+                parsed_active.add(m_clean)
             elif m_clean == "all":
                 parsed_active = {"anomaly", "lane_line", "pothole", "road_sign"}
+
+        if not parsed_active:
+            parsed_active = {"anomaly", "lane_line", "pothole", "road_sign"}
 
         for model_key in ["anomaly", "lane_line", "pothole", "road_sign"]:
             if model_key in parsed_active:
