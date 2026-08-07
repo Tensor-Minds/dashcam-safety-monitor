@@ -447,8 +447,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (ctx && video.videoWidth > 0 && video.videoHeight > 0) {
       const captureScale = Math.min(
         1,
-        640 / video.videoWidth,
-        360 / video.videoHeight
+        1280 / video.videoWidth,
+        720 / video.videoHeight
       );
       canvas.width = Math.max(1, Math.round(video.videoWidth * captureScale));
       canvas.height = Math.max(1, Math.round(video.videoHeight * captureScale));
@@ -479,7 +479,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (isPlayingRef.current) {
         animationFrameRef.current = requestAnimationFrame(streamFrameLoop);
       }
-    }, 100);
+    }, 33);
   };
 
   const toggleVideoPlay = (e?: React.MouseEvent) => {
@@ -1109,11 +1109,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       className="absolute inset-0 w-full h-full pointer-events-none z-10"
                     >
                       {liveDetections.map((detection, index) => {
+                        if (!detection || !detection.bbox || detection.bbox.length < 4) return null;
                         const [x1, y1, x2, y2] = detection.bbox;
-                        const colour = `rgb(${detection.color[2]}, ${detection.color[1]}, ${detection.color[0]})`;
-                        const label = `${detection.class_name} ${(detection.confidence * 100).toFixed(0)}%`;
+                        const rawColor = Array.isArray(detection.color) && detection.color.length === 3 ? detection.color : [0, 255, 0];
+                        const colour = `rgb(${rawColor[2]}, ${rawColor[1]}, ${rawColor[0]})`;
+                        const label = `${detection.class_name || "Hazard"} ${((detection.confidence || 0) * 100).toFixed(0)}%`;
                         return (
-                          <g key={`${detection.category}-${index}`}>
+                          <g key={`${detection.category || 'det'}-${index}`}>
                             <rect
                               x={x1}
                               y={y1}

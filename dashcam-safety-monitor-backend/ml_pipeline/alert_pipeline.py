@@ -422,39 +422,37 @@ class ReportAlertPipeline:
                 last_alert = track.last_rule_alert_ms.get(rule["id"], -1e12)
                 if timestamp_ms - last_alert < rule["cooldown_ms"]:
                     continue
-                track.last_rule_alert_ms[rule["id"]] = timestamp_ms
-                candidates.append(
-                    self._candidate_from_rule(
-                        rule,
-                        detection,
-                        track.track_id,
-                        timestamp_ms,
-                        values,
-                        {
-                            "temporal_hits": hits,
-                            "temporal_window": (
-                                temporal.get("window_frames") if temporal else None
-                            ),
-                            "required_hits": (
-                                temporal.get("minimum_hits") if temporal else None
-                            ),
-                            "duration_ms": duration_ms,
-                            "required_duration_ms": (
-                                temporal.get("minimum_duration_ms", 0)
-                                if temporal
-                                else 0
-                            ),
-                            "maximum_misses": (
-                                temporal.get("maximum_misses")
-                                if temporal
-                                else None
-                            ),
-                            "spatial_iou_threshold": self.rule_config.system[
-                                "tracking_iou_threshold"
-                            ],
-                        },
-                    )
+                candidate_item = self._candidate_from_rule(
+                    rule,
+                    detection,
+                    track.track_id,
+                    timestamp_ms,
+                    values,
+                    {
+                        "temporal_hits": hits,
+                        "temporal_window": (
+                            temporal.get("window_frames") if temporal else None
+                        ),
+                        "required_hits": (
+                            temporal.get("minimum_hits") if temporal else None
+                        ),
+                        "duration_ms": duration_ms,
+                        "required_duration_ms": (
+                            temporal.get("minimum_duration_ms", 0)
+                            if temporal
+                            else 0
+                        ),
+                        "maximum_misses": (
+                            temporal.get("maximum_misses")
+                            if temporal
+                            else None
+                        ),
+                        "spatial_iou_threshold": self.rule_config.system[
+                            "tracking_iou_threshold"
+                        ],
+                    },
                 )
+                candidates.append(candidate_item)
         return candidates
 
     def _lane_candidate(
@@ -636,6 +634,8 @@ class ReportAlertPipeline:
         if persist_state:
             self.last_communication_ms = timestamp_ms
             self.last_primary = dict(primary)
+            if primary.get("track_id") and primary["track_id"] in self.tracks:
+                self.tracks[primary["track_id"]].last_rule_alert_ms[primary["rule_id"]] = timestamp_ms
         return primary
 
     def _single_frame_primary(
