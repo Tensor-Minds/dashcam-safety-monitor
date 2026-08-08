@@ -891,8 +891,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* IMAGE MODE VIEW */}
       {mediaType === "image" && imageResult && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-md">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3 bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-md">
             <div className="flex items-center justify-between mb-3 px-2">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Layers className="w-4 h-4 text-indigo-400" /> YOLOv8 Priority-Annotated Image Output
@@ -900,11 +900,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {getPriorityBadge(imageResult.highest_priority)}
             </div>
 
-            <div className="relative rounded-xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center min-h-[360px]">
+            <div className="relative rounded-xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center min-h-[450px]">
               <img
                 src={imageResult.annotated_image}
                 alt="YOLO annotated output"
-                className="max-h-[500px] w-full object-contain"
+                className="max-h-[70vh] min-h-[450px] w-full object-contain"
               />
             </div>
           </div>
@@ -964,8 +964,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* VIDEO MODE VIEW */}
       {mediaType === "video" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3 space-y-4">
             {/* Action Bar for Server-Side Video Processing vs Live Streaming */}
             <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-xl">
               <div className="space-y-1">
@@ -1015,23 +1015,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
 
                 {videoResult.annotated_video_url ? (
-                  <div className="relative rounded-xl overflow-hidden bg-black border border-slate-800 min-h-[380px]">
+                  <div className="relative rounded-xl overflow-hidden bg-black border border-slate-800 min-h-[450px]">
                     <video
                       src={`${apiHost}${videoResult.annotated_video_url}`}
                       controls
                       autoPlay
                       loop
                       playsInline
-                      className="w-full max-h-[460px] object-contain mx-auto"
+                      className="w-full max-h-[70vh] min-h-[450px] object-contain mx-auto"
                     />
                   </div>
                 ) : videoResult.timeline_alerts.length > 0 && (
                   <div className="space-y-3">
-                    <div className="relative rounded-xl overflow-hidden bg-black border border-slate-800 min-h-[380px] flex items-center justify-center">
+                    <div className="relative rounded-xl overflow-hidden bg-black border border-slate-800 min-h-[450px] flex items-center justify-center">
                       <img
                         src={videoResult.timeline_alerts[selectedTimelineIdx]?.annotated_frame}
                         alt="Server processed frame"
-                        className="max-h-[460px] w-full object-contain"
+                        className="max-h-[70vh] min-h-[450px] w-full object-contain"
                       />
                     </div>
 
@@ -1082,7 +1082,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 )}
 
                 {/* Visible Video Player + Real-Time YOLO Overlay */}
-                <div className="relative rounded-xl overflow-hidden bg-black border border-slate-800 min-h-[380px] flex items-center justify-center">
+                <div className="relative rounded-xl overflow-hidden bg-black border border-slate-800 min-h-[450px] flex items-center justify-center">
                   <video
                     ref={videoRef}
                     playsInline
@@ -1091,7 +1091,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     controls
                     onPlay={handleVideoPlayEvent}
                     onPause={handleVideoPauseEvent}
-                    className="w-full max-h-[460px] object-contain block"
+                    className="w-full max-h-[70vh] min-h-[450px] object-contain block"
                   />
 
                   {liveDetections.length > 0 && (

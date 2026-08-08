@@ -168,7 +168,7 @@ export default function Home() {
         <div className="absolute top-1/3 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <div className="relative w-full max-w-none px-4 sm:px-8 lg:px-12 py-6 space-y-6">
         {/* Navigation / Header */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
           <div className="flex items-center gap-3">
