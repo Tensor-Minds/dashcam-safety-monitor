@@ -257,66 +257,7 @@ class ReportAlertPipeline:
     def _annotate_spatial_context(
         self, detections: List[Dict[str, Any]], width: int, height: int
     ) -> List[Dict[str, Any]]:
-        """Attach proposal-defined relative pothole proximity and ego-lane context."""
-        lane_config = self.rule_config.data["lane"]
-        lane_positions: List[float] = []
-        for detection in detections:
-            if (
-                detection.get("category") != "lane_line"
-                or float(detection.get("confidence", 0))
-                < lane_config["minimum_confidence"]
-                or str(detection.get("class_name", "")).lower()
-                not in {"line 1", "line 2", "yellow markings"}
-            ):
-                continue
-            polygon = detection.get("polygon")
-            if polygon and len(polygon) >= 3:
-                y_values = np.asarray([point[1] for point in polygon], dtype=float)
-                x_values = np.asarray([point[0] for point in polygon], dtype=float)
-                try:
-                    coefficients = np.polyfit(y_values, x_values, 2)
-                    lane_positions.append(
-                        float(np.polyval(coefficients, height * 0.9))
-                    )
-                except (ValueError, np.linalg.LinAlgError):
-                    continue
-            else:
-                box = detection["bbox"]
-                lane_positions.append((box[0] + box[2]) / 2)
-        lane_positions.sort()
-        has_lane_boundaries = len(lane_positions) >= 2
-        pothole_config = self.rule_config.data["pothole_filter"]
-        for detection in detections:
-            if detection.get("category") != "pothole":
-                continue
-            box = detection["bbox"]
-            centre_x_ratio = ((box[0] + box[2]) / 2) / max(1, width)
-            bottom_y_ratio = box[3] / max(1, height)
-            if bottom_y_ratio >= pothole_config["near_bottom_y_ratio"]:
-                proximity = "near"
-            elif bottom_y_ratio >= pothole_config["medium_bottom_y_ratio"]:
-                proximity = "medium"
-            else:
-                proximity = "far"
-            if has_lane_boundaries:
-                centre_x = (box[0] + box[2]) / 2
-                inside_ego_lane = (
-                    lane_positions[0] <= centre_x <= lane_positions[-1]
-                )
-                ego_lane_source = "detected_lane_boundaries"
-            else:
-                inside_ego_lane = (
-                    pothole_config["fallback_roi_left_ratio"]
-                    <= centre_x_ratio
-                    <= pothole_config["fallback_roi_right_ratio"]
-                    and bottom_y_ratio
-                    >= pothole_config["fallback_roi_minimum_bottom_y_ratio"]
-                )
-                ego_lane_source = "lower_frame_roi_fallback"
-            detection["bottom_y_ratio"] = round(bottom_y_ratio, 4)
-            detection["relative_proximity"] = proximity
-            detection["inside_ego_lane"] = inside_ego_lane
-            detection["ego_lane_source"] = ego_lane_source
+        """Pass through detections directly without spatial proximity filtering."""
         return detections
 
     def _update_tracks(
@@ -698,16 +639,6 @@ class ReportAlertPipeline:
             )
             return canonical, values
         if detection.get("category") == "pothole":
-            values.update(
-                {
-                    "inside_ego_lane": detection.get("inside_ego_lane", False),
-                    "relative_proximity": detection.get(
-                        "relative_proximity", "unknown"
-                    ),
-                    "bottom_y_ratio": detection.get("bottom_y_ratio"),
-                    "ego_lane_source": detection.get("ego_lane_source"),
-                }
-            )
             return (
                 "Pothole" if raw_label.strip().lower() == "pothole" else raw_label,
                 values,
@@ -718,16 +649,6 @@ class ReportAlertPipeline:
         self, rule: Dict[str, Any], values: Dict[str, Any]
     ) -> bool:
         conditions = rule["conditions"]
-        if "inside_ego_lane" in conditions and (
-            bool(values.get("inside_ego_lane"))
-            != bool(conditions["inside_ego_lane"])
-        ):
-            return False
-        if "relative_proximity" in conditions:
-            expected = conditions["relative_proximity"]
-            allowed = expected if isinstance(expected, list) else [expected]
-            if values.get("relative_proximity") not in allowed:
-                return False
         if conditions.get("speed_limit_exceeded"):
             speed = values.get("vehicle_speed_kmh")
             limit = values.get("speed_limit_kmh")
@@ -784,9 +705,5 @@ class ReportAlertPipeline:
                     else "unavailable"
                 ),
                 "speed_limit_kmh": values.get("speed_limit_kmh"),
-                "inside_ego_lane": values.get("inside_ego_lane"),
-                "relative_proximity": values.get("relative_proximity"),
-                "bottom_y_ratio": values.get("bottom_y_ratio"),
-                "ego_lane_source": values.get("ego_lane_source"),
             },
         }

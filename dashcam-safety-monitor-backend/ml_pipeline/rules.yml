@@ -24,11 +24,6 @@ road_sign_filter:
 pothole_filter:
   minimum_confidence: 0.15  # Minimum model confidence score required for pothole detections
   nms_iou_threshold: 0.40  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping pothole boxes
-  medium_bottom_y_ratio: 0.50  # Normalized frame Y threshold separating medium-distance potholes
-  near_bottom_y_ratio: 0.70  # Normalized frame Y threshold separating near-distance potholes
-  fallback_roi_left_ratio: 0.25  # Left boundary ratio of ROI box when calculating fallback pothole placement
-  fallback_roi_right_ratio: 0.75  # Right boundary ratio of ROI box when calculating fallback pothole placement
-  fallback_roi_minimum_bottom_y_ratio: 0.35  # Minimum bottom Y boundary ratio for fallback ROI filtering
 
 anomaly_filter:
   minimum_confidence: 0.15  # Minimum model confidence score required for anomaly detections
@@ -132,233 +127,73 @@ rules:
       matching_turn_signal_suppresses: true
       unknown_turn_signal_suppresses: true
 
-  - id: pothole-near
+  - id: pothole-detected
     enabled: true
     module: pothole
     labels: [Pothole]
-    minimum_confidence: 0.40
+    minimum_confidence: 0.15
     severity: critical
-    priority: 12
+    priority: 13
     temporal:
-      window_frames: 5
-      minimum_hits: 4
-      maximum_misses: 1
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Warning - pothole very close in the driving path
-    audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: near
-
-  - id: pothole-medium
-    enabled: true
-    module: pothole
-    labels: [Pothole]
-    minimum_confidence: 0.40
-    severity: warning
-    priority: 11
-    temporal:
-      window_frames: 20
-      minimum_hits: 15
+      window_frames: 3
+      minimum_hits: 2
       maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
-    message: Warning - pothole ahead in the driving path
+    message: Warning - pothole detected on road
     audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: medium
+    conditions: {}
 
-  - id: pothole-far
-    enabled: true
-    module: pothole
-    labels: [Pothole]
-    minimum_confidence: 0.40
-    severity: info
-    priority: 10
-    temporal:
-      window_frames: 20
-      minimum_hits: 15
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Pothole detected farther ahead in the driving path
-    audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: far
-
-  - id: alligator-crack-near
+  - id: alligator-crack-detected
     enabled: true
     module: pothole
     labels: [alligator_crack]
-    minimum_confidence: 0.40
+    minimum_confidence: 0.15
     severity: high
     priority: 12
     temporal:
-      window_frames: 20
-      minimum_hits: 15
+      window_frames: 3
+      minimum_hits: 2
       maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
-    message: Warning - alligator road cracking very close in the driving path
+    message: Warning - alligator road cracking detected
     audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: near
+    conditions: {}
 
-  - id: alligator-crack-medium
-    enabled: true
-    module: pothole
-    labels: [alligator_crack]
-    minimum_confidence: 0.40
-    severity: warning
-    priority: 11
-    temporal:
-      window_frames: 20
-      minimum_hits: 15
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Alligator road cracking ahead in the driving path
-    audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: medium
-
-  - id: alligator-crack-far
-    enabled: true
-    module: pothole
-    labels: [alligator_crack]
-    minimum_confidence: 0.40
-    severity: info
-    priority: 10
-    temporal:
-      window_frames: 20
-      minimum_hits: 15
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Alligator road cracking detected farther ahead
-    audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: far
-
-  - id: longitudinal-crack-near
+  - id: longitudinal-crack-detected
     enabled: true
     module: pothole
     labels: [longitudinal_crack]
-    minimum_confidence: 0.40
-    severity: warning
-    priority: 12
-    temporal:
-      window_frames: 20
-      minimum_hits: 15
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Warning - longitudinal road crack very close in the driving path
-    audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: near
-
-  - id: longitudinal-crack-medium
-    enabled: true
-    module: pothole
-    labels: [longitudinal_crack]
-    minimum_confidence: 0.40
+    minimum_confidence: 0.15
     severity: warning
     priority: 11
     temporal:
-      window_frames: 20
-      minimum_hits: 15
+      window_frames: 3
+      minimum_hits: 2
       maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
-    message: Longitudinal road crack ahead in the driving path
+    message: Warning - longitudinal road crack detected
     audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: medium
+    conditions: {}
 
-  - id: longitudinal-crack-far
+  - id: transverse-crack-detected
     enabled: true
     module: pothole
-    labels: [longitudinal_crack]
-    minimum_confidence: 0.40
-    severity: info
+    labels: [transverse_crack]
+    minimum_confidence: 0.15
+    severity: warning
     priority: 10
     temporal:
-      window_frames: 20
-      minimum_hits: 15
+      window_frames: 3
+      minimum_hits: 2
       maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
-    message: Longitudinal road crack detected farther ahead
+    message: Warning - transverse road crack detected
     audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: far
-
-  - id: transverse-crack-near
-    enabled: true
-    module: pothole
-    labels: [transverse_crack]
-    minimum_confidence: 0.40
-    severity: warning
-    priority: 12
-    temporal:
-      window_frames: 20
-      minimum_hits: 15
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Warning - transverse road crack very close in the driving path
-    audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: near
-
-  - id: transverse-crack-medium
-    enabled: true
-    module: pothole
-    labels: [transverse_crack]
-    minimum_confidence: 0.40
-    severity: warning
-    priority: 11
-    temporal:
-      window_frames: 20
-      minimum_hits: 15
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Transverse road crack ahead in the driving path
-    audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: medium
-
-  - id: transverse-crack-far
-    enabled: true
-    module: pothole
-    labels: [transverse_crack]
-    minimum_confidence: 0.40
-    severity: info
-    priority: 10
-    temporal:
-      window_frames: 20
-      minimum_hits: 15
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Transverse road crack detected farther ahead
-    audio_key: pothole
-    conditions:
-      inside_ego_lane: true
-      relative_proximity: far
+    conditions: {}
 
   - id: speed-limit-exceeded
     enabled: true
