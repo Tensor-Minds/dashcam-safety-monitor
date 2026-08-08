@@ -20,14 +20,20 @@ road_sign_filter:
   minimum_aspect_ratio: 0.50  # Minimum width-to-height aspect ratio filter for valid road signs
   maximum_aspect_ratio: 1.50  # Maximum width-to-height aspect ratio filter for valid road signs
   minimum_frame_area_ratio: 0.005  # Minimum bounding box area relative to frame size to filter distant noise
+  window_frames: 5  # Sliding window frame count for temporal majority voting
+  minimum_hits: 3  # Minimum positive detections in window required to trigger alert
 
 pothole_filter:
   minimum_confidence: 0.15  # Minimum model confidence score required for pothole detections
   nms_iou_threshold: 0.40  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping pothole boxes
+  window_frames: 3  # Sliding window frame count for temporal majority voting
+  minimum_hits: 2  # Minimum positive detections in window required to trigger alert
 
 anomaly_filter:
   minimum_confidence: 0.15  # Minimum model confidence score required for anomaly detections
   nms_iou_threshold: 0.40  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping anomaly boxes
+  window_frames: 6  # Sliding window frame count for temporal majority voting
+  minimum_hits: 4  # Minimum positive detections in window required to trigger alert
 
 lane:
   minimum_confidence: 0.15  # Minimum model confidence score required for lane line detections
@@ -50,7 +56,6 @@ rules:
     temporal:
       window_frames: 6
       minimum_hits: 4
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
     message: Potential road accident detected ahead
@@ -67,7 +72,6 @@ rules:
     temporal:
       window_frames: 6
       minimum_hits: 4
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
     message: Potential vehicle fire detected ahead
@@ -85,7 +89,6 @@ rules:
       window_frames: 6
       minimum_hits: 4
       minimum_duration_ms: 2000
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
     message: Potential fighting incident detected
@@ -103,7 +106,6 @@ rules:
       window_frames: 6
       minimum_hits: 4
       minimum_duration_ms: 2000
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
     message: Potential snatching incident detected
@@ -137,7 +139,6 @@ rules:
     temporal:
       window_frames: 3
       minimum_hits: 2
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
     message: Warning - pothole detected on road
@@ -154,7 +155,6 @@ rules:
     temporal:
       window_frames: 3
       minimum_hits: 2
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
     message: Warning - alligator road cracking detected
@@ -171,7 +171,6 @@ rules:
     temporal:
       window_frames: 3
       minimum_hits: 2
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
     message: Warning - longitudinal road crack detected
@@ -188,7 +187,6 @@ rules:
     temporal:
       window_frames: 3
       minimum_hits: 2
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
     message: Warning - transverse road crack detected
@@ -206,7 +204,6 @@ rules:
       window_frames: 5
       minimum_hits: 3
       minimum_duration_ms: 1500
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 5000
     message: Reduce speed - {vehicle_speed_kmh} km/h in a {speed_limit_kmh} km/h zone
@@ -225,7 +222,6 @@ rules:
     temporal:
       window_frames: 5
       minimum_hits: 3
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 10000
     message: Red traffic light detected
@@ -242,7 +238,6 @@ rules:
     temporal:
       window_frames: 5
       minimum_hits: 3
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 10000
     message: Stop sign ahead
@@ -275,7 +270,6 @@ rules:
     temporal:
       window_frames: 5
       minimum_hits: 3
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 10000
     message: "{sign_message}"
@@ -292,7 +286,6 @@ rules:
     temporal:
       window_frames: 5
       minimum_hits: 3
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 10000
     message: Speed limit {speed_limit_kmh} detected
@@ -311,7 +304,6 @@ rules:
     temporal:
       window_frames: 5
       minimum_hits: 3
-      maximum_misses: 2
     visual_duration_ms: 2000
     cooldown_ms: 10000
     message: "{sign_message}"

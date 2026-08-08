@@ -385,7 +385,7 @@ class ReportAlertPipeline:
                         ),
                         "maximum_misses": (
                             temporal.get("maximum_misses")
-                            if temporal
+                            if temporal and "maximum_misses" in temporal
                             else None
                         ),
                         "spatial_iou_threshold": self.rule_config.system[
