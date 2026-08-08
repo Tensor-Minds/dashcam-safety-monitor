@@ -1,319 +1,350 @@
-version: "2.0"
+version: '2.0'
 priority_policy: higher_number_wins
-
-# Demonstration defaults derived from the interim proposal. These thresholds are
-# configurable and are not claimed to be scientifically validated.
 system:
-  processing_target_fps: 10  # Target frame processing rate per second for performance scaling
-  tracking_iou_threshold: 0.30  # Minimum IOU overlap to associate detections across consecutive frames
-  duplicate_iou_threshold: 0.50  # Overlap threshold to merge/suppress duplicate bounding boxes
-  visual_duration_ms: 2000  # Default duration (in ms) an alert remains visible on screen
-  maximum_track_misses: 2  # Max consecutive frames a tracked object can be missed before dropping track
-  minimum_blur_score: 80  # Laplacian variance threshold below which frame is flagged as blurry
-  minimum_mean_brightness: 25  # Minimum mean pixel intensity threshold (0-255) for underexposed frame check
-  maximum_mean_brightness: 235  # Maximum mean pixel intensity threshold (0-255) for overexposed frame check
-  image_quality_status_cooldown_ms: 10000  # Cooldown period (in ms) between repeating image quality status alerts
-
+  processing_target_fps: 10
+  tracking_iou_threshold: 0.3
+  duplicate_iou_threshold: 0.5
+  visual_duration_ms: 2000
+  maximum_track_misses: 2
+  minimum_blur_score: 5
+  minimum_mean_brightness: 5
+  maximum_mean_brightness: 250
+  image_quality_status_cooldown_ms: 10000
 road_sign_filter:
-  minimum_confidence: 0.15  # Minimum model confidence score required for road sign detections
-  nms_iou_threshold: 0.45  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping sign boxes
-  minimum_aspect_ratio: 0.50  # Minimum width-to-height aspect ratio filter for valid road signs
-  maximum_aspect_ratio: 1.50  # Maximum width-to-height aspect ratio filter for valid road signs
-  minimum_frame_area_ratio: 0.005  # Minimum bounding box area relative to frame size to filter distant noise
-
+  minimum_confidence: 0.15
+  nms_iou_threshold: 0.45
+  minimum_aspect_ratio: 0.2
+  maximum_aspect_ratio: 2.5
+  minimum_frame_area_ratio: 0.0001
+  window_frames: 3
+  minimum_hits: 1
 pothole_filter:
-  minimum_confidence: 0.15  # Minimum model confidence score required for pothole detections
-  nms_iou_threshold: 0.40  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping pothole boxes
-
+  minimum_confidence: 0.15
+  nms_iou_threshold: 0.4
+  window_frames: 3
+  minimum_hits: 1
 anomaly_filter:
-  minimum_confidence: 0.15  # Minimum model confidence score required for anomaly detections
-  nms_iou_threshold: 0.40  # Non-Maximum Suppression (NMS) IOU threshold for filtering overlapping anomaly boxes
-
+  minimum_confidence: 0.5
+  nms_iou_threshold: 0.4
+  window_frames: 3
+  minimum_hits: 1
 lane:
-  minimum_confidence: 0.15  # Minimum model confidence score required for lane line detections
-  ema_alpha: 0.70  # Exponential Moving Average (EMA) smoothing factor for lane offset tracking
-  trigger_offset_ratio: 0.35  # Offset threshold ratio from lane center required to trigger lane departure alert
-  clear_offset_ratio: 0.20  # Offset threshold ratio below which lane departure alert state clears
-  minimum_duration_ms: 1500  # Minimum continuous departure duration (in ms) required before triggering alert
-
-# Priority is intentionally limited to 0..number_of_rules. The largest active
-# number wins, preserving proposal order:
-# anomaly > lane departure > pothole > road sign.
+  minimum_confidence: 0.15
+  ema_alpha: 0.7
+  trigger_offset_ratio: 0.35
+  clear_offset_ratio: 0.2
+  minimum_duration_ms: 1500
 rules:
-  - id: anomaly-accident
-    enabled: true
-    module: anomaly
-    labels: [Accident]
-    minimum_confidence: 0.55
-    severity: critical
-    priority: 14
-    temporal:
-      window_frames: 6
-      minimum_hits: 4
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Potential road accident detected ahead
-    audio_key: anomaly
-    conditions: {}
-
-  - id: anomaly-car-fire
-    enabled: true
-    module: anomaly
-    labels: [Car Fire]
-    minimum_confidence: 0.55
-    severity: critical
-    priority: 14
-    temporal:
-      window_frames: 6
-      minimum_hits: 4
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Potential vehicle fire detected ahead
-    audio_key: anomaly
-    conditions: {}
-
-  - id: anomaly-fighting
-    enabled: true
-    module: anomaly
-    labels: [Fighting]
-    minimum_confidence: 0.55
-    severity: critical
-    priority: 14
-    temporal:
-      window_frames: 6
-      minimum_hits: 4
-      minimum_duration_ms: 2000
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Potential fighting incident detected
-    audio_key: anomaly
-    conditions: {}
-
-  - id: anomaly-snatching
-    enabled: true
-    module: anomaly
-    labels: [Snatching]
-    minimum_confidence: 0.55
-    severity: critical
-    priority: 14
-    temporal:
-      window_frames: 6
-      minimum_hits: 4
-      minimum_duration_ms: 2000
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Potential snatching incident detected
-    audio_key: anomaly
-    conditions: {}
-
-  - id: lane-departure
-    enabled: true
-    module: lane_line
-    labels: [Lane Departure]
-    minimum_confidence: 0.50
-    severity: critical
-    priority: 13
-    temporal:
-      minimum_duration_ms: 1500
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Lane departure - drifting {direction}
-    audio_key: lane_departure
-    conditions:
-      matching_turn_signal_suppresses: true
-      unknown_turn_signal_suppresses: true
-
-  - id: pothole-detected
-    enabled: true
-    module: pothole
-    labels: [Pothole]
-    minimum_confidence: 0.15
-    severity: critical
-    priority: 13
-    temporal:
-      window_frames: 3
-      minimum_hits: 2
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Warning - pothole detected on road
-    audio_key: pothole
-    conditions: {}
-
-  - id: alligator-crack-detected
-    enabled: true
-    module: pothole
-    labels: [alligator_crack]
-    minimum_confidence: 0.15
-    severity: high
-    priority: 12
-    temporal:
-      window_frames: 3
-      minimum_hits: 2
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Warning - alligator road cracking detected
-    audio_key: pothole
-    conditions: {}
-
-  - id: longitudinal-crack-detected
-    enabled: true
-    module: pothole
-    labels: [longitudinal_crack]
-    minimum_confidence: 0.15
-    severity: warning
-    priority: 11
-    temporal:
-      window_frames: 3
-      minimum_hits: 2
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Warning - longitudinal road crack detected
-    audio_key: pothole
-    conditions: {}
-
-  - id: transverse-crack-detected
-    enabled: true
-    module: pothole
-    labels: [transverse_crack]
-    minimum_confidence: 0.15
-    severity: warning
-    priority: 10
-    temporal:
-      window_frames: 3
-      minimum_hits: 2
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Warning - transverse road crack detected
-    audio_key: pothole
-    conditions: {}
-
-  - id: speed-limit-exceeded
-    enabled: true
-    module: road_sign
-    labels: [Speed Limit]
-    minimum_confidence: 0.60
-    severity: warning
-    priority: 9
-    temporal:
-      window_frames: 5
-      minimum_hits: 3
-      minimum_duration_ms: 1500
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 5000
-    message: Reduce speed - {vehicle_speed_kmh} km/h in a {speed_limit_kmh} km/h zone
-    audio_key: road_sign
-    conditions:
-      speed_limit_exceeded: true
-      speed_tolerance_kmh: 5
-
-  - id: red-light
-    enabled: true
-    module: road_sign
-    labels: [Red-Light]
-    minimum_confidence: 0.60
-    severity: warning
-    priority: 8
-    temporal:
-      window_frames: 5
-      minimum_hits: 3
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 10000
-    message: Red traffic light detected
-    audio_key: road_sign
-    conditions: {}
-
-  - id: stop-sign
-    enabled: true
-    module: road_sign
-    labels: [Stop, Stop-Ahead]
-    minimum_confidence: 0.60
-    severity: warning
-    priority: 8
-    temporal:
-      window_frames: 5
-      minimum_hits: 3
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 10000
-    message: Stop sign ahead
-    audio_key: road_sign
-    conditions: {}
-
-  - id: warning-road-sign
-    enabled: true
-    module: road_sign
-    labels:
-      - Children-Present-Or-Crossing-Ahead
-      - Children-Crossing
-      - Double-Bend-To-Left-Ahead
-      - Double-Bend-To-Right-Ahead
-      - Left-Bend-Ahead
-      - Narrow-Bridge-Or-Culvert-Ahead
-      - Pedestrian-Crossing
-      - Pedestrian-Crossing-Ahead
-      - Right-Bend-Ahead
-      - T-Junction-Ahead
-      - Traffic-From-Left-Merges-Ahead
-      - Traffic-From-Right-Merges-Ahead
-      - Level-Crossing-With-Gates
-      - No-Left-Turn
-      - No-Right-Turn
-      - No-U-Turn
-    minimum_confidence: 0.60
-    severity: warning
-    priority: 7
-    temporal:
-      window_frames: 5
-      minimum_hits: 3
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 10000
-    message: "{sign_message}"
-    audio_key: road_sign
-    conditions: {}
-
-  - id: speed-limit-detected
-    enabled: true
-    module: road_sign
-    labels: [Speed Limit]
-    minimum_confidence: 0.60
-    severity: info
-    priority: 6
-    temporal:
-      window_frames: 5
-      minimum_hits: 3
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 10000
-    message: Speed limit {speed_limit_kmh} detected
-    audio_key: road_sign
-    conditions: {}
-
-  # Covers the remaining classes actually emitted by the current 35-class
-  # road-sign model. "Give Way" can be added when a trained model emits it.
-  - id: other-road-sign
-    enabled: true
-    module: road_sign
-    labels: ["*"]
-    minimum_confidence: 0.60
-    severity: info
-    priority: 5
-    temporal:
-      window_frames: 5
-      minimum_hits: 3
-      maximum_misses: 2
-    visual_duration_ms: 2000
-    cooldown_ms: 10000
-    message: "{sign_message}"
-    audio_key: road_sign
-    conditions: {}
+- id: anomaly-accident
+  enabled: true
+  module: anomaly
+  labels:
+  - Accident
+  minimum_confidence: 0.15
+  severity: critical
+  priority: 14
+  temporal:
+    window_frames: 3
+    minimum_hits: 1
+  visual_duration_ms: 2000
+  cooldown_ms: 1000
+  message: Warning. Possible road accident detected ahead. Slow down safely and keep
+    your distance.
+  audio_key: anomaly
+  conditions: {}
+- id: anomaly-car-fire
+  enabled: true
+  module: anomaly
+  labels:
+  - Car Fire
+  minimum_confidence: 0.15
+  severity: critical
+  priority: 14
+  temporal:
+    window_frames: 3
+    minimum_hits: 1
+  visual_duration_ms: 2000
+  cooldown_ms: 1000
+  message: Warning. Possible vehicle fire detected ahead. Keep a safe distance.
+  audio_key: anomaly
+  conditions: {}
+- id: anomaly-fighting
+  enabled: true
+  module: anomaly
+  labels:
+  - Fighting
+  minimum_confidence: 0.15
+  severity: critical
+  priority: 14
+  temporal:
+    window_frames: 3
+    minimum_hits: 1
+  visual_duration_ms: 2000
+  cooldown_ms: 1000
+  message: Possible dangerous incident detected ahead. Proceed carefully.
+  audio_key: anomaly
+  conditions: {}
+- id: anomaly-snatching
+  enabled: true
+  module: anomaly
+  labels:
+  - Snatching
+  minimum_confidence: 0.15
+  severity: critical
+  priority: 14
+  temporal:
+    window_frames: 3
+    minimum_hits: 1
+  visual_duration_ms: 2000
+  cooldown_ms: 1000
+  message: Possible dangerous incident detected ahead. Proceed carefully.
+  audio_key: anomaly
+  conditions: {}
+- id: lane-departure
+  enabled: true
+  module: lane_line
+  labels:
+  - Lane Departure
+  minimum_confidence: 0.5
+  severity: critical
+  priority: 13
+  temporal:
+    minimum_duration_ms: 1500
+  visual_duration_ms: 2000
+  cooldown_ms: 1500
+  message: Lane departure warning. Drifting {direction}. Return to your lane when
+    safe.
+  audio_key: lane_departure
+  conditions:
+    matching_turn_signal_suppresses: true
+    unknown_turn_signal_suppresses: true
+- id: lane-pedestrian-crossing
+  enabled: true
+  module: lane_line
+  labels:
+  - Crossing
+  - Crosswalk
+  - Pedestrian Crossing
+  - Pedestrian-Crossing
+  minimum_confidence: 0.15
+  severity: warning
+  priority: 8
+  temporal:
+    window_frames: 3
+    minimum_hits: 2
+  visual_duration_ms: 2000
+  cooldown_ms: 1500
+  message: Warning. Pedestrian crossing detected ahead. Slow down and be prepared
+    to stop.
+  audio_key: road_sign
+  conditions: {}
+- id: pothole-detected
+  enabled: true
+  module: pothole
+  labels:
+  - Pothole
+  minimum_confidence: 0.15
+  severity: critical
+  priority: 13
+  temporal:
+    window_frames: 3
+    minimum_hits: 2
+  visual_duration_ms: 2000
+  cooldown_ms: 1000
+  message: Warning. Possible pothole ahead. Reduce speed safely.
+  audio_key: pothole
+  conditions: {}
+- id: alligator-crack-detected
+  enabled: true
+  module: pothole
+  labels:
+  - alligator_crack
+  minimum_confidence: 0.15
+  severity: high
+  priority: 12
+  temporal:
+    window_frames: 3
+    minimum_hits: 2
+  visual_duration_ms: 2000
+  cooldown_ms: 1000
+  message: Warning. Road-surface damage detected ahead. Proceed carefully.
+  audio_key: pothole
+  conditions: {}
+- id: longitudinal-crack-detected
+  enabled: true
+  module: pothole
+  labels:
+  - longitudinal_crack
+  minimum_confidence: 0.15
+  severity: warning
+  priority: 11
+  temporal:
+    window_frames: 3
+    minimum_hits: 2
+  visual_duration_ms: 2000
+  cooldown_ms: 1000
+  message: Warning. Road-surface damage detected ahead. Proceed carefully.
+  audio_key: pothole
+  conditions: {}
+- id: transverse-crack-detected
+  enabled: true
+  module: pothole
+  labels:
+  - transverse_crack
+  minimum_confidence: 0.15
+  severity: warning
+  priority: 10
+  temporal:
+    window_frames: 3
+    minimum_hits: 2
+  visual_duration_ms: 2000
+  cooldown_ms: 1000
+  message: Warning. Road-surface damage detected ahead. Proceed carefully.
+  audio_key: pothole
+  conditions: {}
+- id: speed-limit-exceeded
+  enabled: true
+  module: road_sign
+  labels:
+  - Speed Limit
+  minimum_confidence: 0.6
+  severity: warning
+  priority: 9
+  temporal:
+    window_frames: 5
+    minimum_hits: 3
+    minimum_duration_ms: 1500
+  visual_duration_ms: 2000
+  cooldown_ms: 1500
+  message: Reduce speed. Current speed is {vehicle_speed_kmh} kilometers per hour
+    in a {speed_limit_kmh} zone.
+  audio_key: road_sign
+  conditions:
+    speed_limit_exceeded: true
+    speed_tolerance_kmh: 5
+- id: red-light
+  enabled: true
+  module: road_sign
+  labels:
+  - Red-Light
+  - Red Light
+  minimum_confidence: 0.6
+  severity: warning
+  priority: 8
+  temporal:
+    window_frames: 5
+    minimum_hits: 3
+  visual_duration_ms: 2000
+  cooldown_ms: 1500
+  message: Warning. Red traffic light detected ahead.
+  audio_key: road_sign
+  conditions: {}
+- id: green-light
+  enabled: true
+  module: road_sign
+  labels:
+  - Green-Light
+  - Green Light
+  minimum_confidence: 0.6
+  severity: info
+  priority: 6
+  temporal:
+    window_frames: 5
+    minimum_hits: 3
+  visual_duration_ms: 2000
+  cooldown_ms: 2000
+  message: Green traffic light detected.
+  audio_key: road_sign
+  conditions: {}
+- id: stop-sign
+  enabled: true
+  module: road_sign
+  labels:
+  - Stop
+  - Stop-Ahead
+  - Stop Sign
+  minimum_confidence: 0.6
+  severity: warning
+  priority: 8
+  temporal:
+    window_frames: 5
+    minimum_hits: 3
+  visual_duration_ms: 2000
+  cooldown_ms: 1500
+  message: Warning. Stop sign detected ahead.
+  audio_key: road_sign
+  conditions: {}
+- id: warning-road-sign
+  enabled: true
+  module: road_sign
+  labels:
+  - Children-Present-Or-Crossing-Ahead
+  - Children-Crossing
+  - children crossing
+  - Double-Bend-To-Left-Ahead
+  - Double-Bend-To-Right-Ahead
+  - Left-Bend-Ahead
+  - Narrow-Bridge-Or-Culvert-Ahead
+  - Pedestrian-Crossing
+  - Pedestrian-Crossing-Ahead
+  - Right-Bend-Ahead
+  - T-Junction-Ahead
+  - Traffic-From-Left-Merges-Ahead
+  - Traffic-From-Right-Merges-Ahead
+  - Level-Crossing-With-Gates
+  - level crossing with gates
+  - hospital
+  - Hospital
+  - no honking
+  - No-Honking
+  - no left turn
+  - No-Left-Turn
+  - no right turn
+  - No-Right-Turn
+  - no u turn
+  - No-U-Turn
+  - Bus-Stop
+  - Bus Stop
+  minimum_confidence: 0.6
+  severity: warning
+  priority: 7
+  temporal:
+    window_frames: 5
+    minimum_hits: 3
+  visual_duration_ms: 2000
+  cooldown_ms: 1500
+  message: '{sign_message}'
+  audio_key: road_sign
+  conditions: {}
+- id: speed-limit-detected
+  enabled: true
+  module: road_sign
+  labels:
+  - Speed Limit
+  minimum_confidence: 0.6
+  severity: info
+  priority: 6
+  temporal:
+    window_frames: 5
+    minimum_hits: 3
+  visual_duration_ms: 2000
+  cooldown_ms: 2000
+  message: Speed limit {speed_limit_kmh} kilometers per hour detected.
+  audio_key: road_sign
+  conditions: {}
+- id: other-road-sign
+  enabled: true
+  module: road_sign
+  labels:
+  - '*'
+  minimum_confidence: 0.6
+  severity: info
+  priority: 5
+  temporal:
+    window_frames: 5
+    minimum_hits: 3
+  visual_duration_ms: 2000
+  cooldown_ms: 2000
+  message: '{sign_message}'
+  audio_key: road_sign
+  conditions: {}

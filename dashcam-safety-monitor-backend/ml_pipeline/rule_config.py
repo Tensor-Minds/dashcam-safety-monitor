@@ -23,7 +23,6 @@ ALLOWED_TEMPORAL_FIELDS = {
     "window_frames",
     "minimum_hits",
     "minimum_duration_ms",
-    "maximum_misses",
 }
 
 
@@ -116,12 +115,21 @@ class RuleConfiguration:
                 "minimum_aspect_ratio",
                 "maximum_aspect_ratio",
                 "minimum_frame_area_ratio",
+                "window_frames",
+                "minimum_hits",
             },
             "pothole_filter": {
                 "minimum_confidence",
                 "nms_iou_threshold",
+                "window_frames",
+                "minimum_hits",
             },
-            "anomaly_filter": {"minimum_confidence", "nms_iou_threshold"},
+            "anomaly_filter": {
+                "minimum_confidence",
+                "nms_iou_threshold",
+                "window_frames",
+                "minimum_hits",
+            },
             "lane": {
                 "minimum_confidence",
                 "ema_alpha",
