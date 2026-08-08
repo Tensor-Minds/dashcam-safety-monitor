@@ -14,8 +14,6 @@ ALLOWED_MODULES = {"anomaly", "lane_line", "pothole", "road_sign"}
 ALLOWED_SEVERITIES = {"info", "warning", "high", "critical"}
 ALLOWED_AUDIO_KEYS = {None, "anomaly", "lane_departure", "pothole", "road_sign"}
 ALLOWED_CONDITIONS = {
-    "inside_ego_lane",
-    "relative_proximity",
     "speed_limit_exceeded",
     "speed_tolerance_kmh",
     "matching_turn_signal_suppresses",
@@ -122,11 +120,6 @@ class RuleConfiguration:
             "pothole_filter": {
                 "minimum_confidence",
                 "nms_iou_threshold",
-                "medium_bottom_y_ratio",
-                "near_bottom_y_ratio",
-                "fallback_roi_left_ratio",
-                "fallback_roi_right_ratio",
-                "fallback_roi_minimum_bottom_y_ratio",
             },
             "anomaly_filter": {"minimum_confidence", "nms_iou_threshold"},
             "lane": {
@@ -157,17 +150,10 @@ class RuleConfiguration:
             raise ValueError("System IoU or image-quality thresholds are invalid")
         pothole_filter = data["pothole_filter"]
         if not (
-            0
-            <= pothole_filter["fallback_roi_left_ratio"]
-            < pothole_filter["fallback_roi_right_ratio"]
-            <= 1
-            and 0
-            <= pothole_filter["fallback_roi_minimum_bottom_y_ratio"]
-            <= pothole_filter["medium_bottom_y_ratio"]
-            < pothole_filter["near_bottom_y_ratio"]
-            <= 1
+            0 <= pothole_filter["minimum_confidence"] <= 1
+            and 0 <= pothole_filter["nms_iou_threshold"] <= 1
         ):
-            raise ValueError("Pothole proximity or fallback ROI thresholds are invalid")
+            raise ValueError("Pothole filter thresholds are invalid")
         lane = data["lane"]
         if not (
             0 < lane["ema_alpha"] <= 1
