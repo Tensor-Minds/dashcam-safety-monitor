@@ -28,29 +28,29 @@ ANOMALY_LABELS = {
 }
 SPEED_LIMIT = re.compile(r"^speed[ _-]*limit[ _-]*(\d{1,3})$", re.IGNORECASE)
 ROAD_SIGN_MESSAGES = {
-    "Green-Light": "Green traffic light detected",
-    "Red-Light": "Red traffic light ahead",
-    "Stop": "Stop sign ahead",
-    "Stop-Ahead": "Stop sign ahead",
-    "Bus-Stop": "Bus stop ahead",
-    "Children-Present-Or-Crossing-Ahead": "Children crossing ahead",
-    "Children-Crossing": "Children crossing ahead",
-    "Double-Bend-To-Left-Ahead": "Double bend to the left ahead",
-    "Double-Bend-To-Right-Ahead": "Double bend to the right ahead",
-    "Left-Bend-Ahead": "Left bend ahead",
-    "Narrow-Bridge-Or-Culvert-Ahead": "Narrow bridge or culvert ahead",
-    "Pedestrian-Crossing": "Pedestrian crossing ahead",
-    "Pedestrian-Crossing-Ahead": "Pedestrian crossing ahead",
-    "Right-Bend-Ahead": "Right bend ahead",
-    "T-Junction-Ahead": "T junction ahead",
-    "Traffic-From-Left-Merges-Ahead": "Traffic merges from the left ahead",
-    "Traffic-From-Right-Merges-Ahead": "Traffic merges from the right ahead",
-    "Level-Crossing-With-Gates": "Level crossing with gates ahead",
-    "Hospital": "Hospital ahead",
-    "No-Honking": "No honking sign ahead",
-    "No-Left-Turn": "No left turn",
-    "No-Right-Turn": "No right turn",
-    "No-U-Turn": "No U turn",
+    "Green-Light": "Green traffic light detected.",
+    "Red-Light": "Warning. Red traffic light detected ahead.",
+    "Stop": "Warning. Stop sign detected ahead.",
+    "Stop-Ahead": "Warning. Stop sign detected ahead.",
+    "Bus-Stop": "Bus stop detected.",
+    "Children-Present-Or-Crossing-Ahead": "Warning. Children crossing detected ahead. Slow down and be prepared to stop.",
+    "Children-Crossing": "Warning. Children crossing detected ahead. Slow down and be prepared to stop.",
+    "Double-Bend-To-Left-Ahead": "Warning. Double bend to left ahead.",
+    "Double-Bend-To-Right-Ahead": "Warning. Double bend to right ahead.",
+    "Left-Bend-Ahead": "Warning. Left bend ahead.",
+    "Narrow-Bridge-Or-Culvert-Ahead": "Warning. Narrow bridge detected ahead.",
+    "Pedestrian-Crossing": "Warning. Pedestrian crossing detected ahead. Slow down and be prepared to stop.",
+    "Pedestrian-Crossing-Ahead": "Warning. Pedestrian crossing detected ahead. Slow down and be prepared to stop.",
+    "Right-Bend-Ahead": "Warning. Right bend ahead.",
+    "T-Junction-Ahead": "Warning. T junction ahead.",
+    "Traffic-From-Left-Merges-Ahead": "Warning. Traffic merging from left ahead.",
+    "Traffic-From-Right-Merges-Ahead": "Warning. Traffic merging from right ahead.",
+    "Level-Crossing-With-Gates": "Warning. Level crossing detected ahead.",
+    "Hospital": "Hospital zone ahead.",
+    "No-Honking": "No honking zone.",
+    "No-Left-Turn": "No left turn permitted.",
+    "No-Right-Turn": "No right turn permitted.",
+    "No-U-Turn": "No U-turn permitted.",
 }
 
 
@@ -267,6 +267,11 @@ class ReportAlertPipeline:
             detection
             for detection in detections
             if detection.get("category") in {"pothole", "anomaly", "road_sign"}
+            or (
+                detection.get("category") == "lane_line"
+                and str(detection.get("class_name", "")).strip().lower()
+                in {"crossing", "crosswalk", "pedestrian crossing", "pedestrian-crossing"}
+            )
         ]
         unmatched = set(self.tracks)
         updated: List[Tuple[SpatialTrack, Dict[str, Any]]] = []
@@ -626,23 +631,30 @@ class ReportAlertPipeline:
         if detection.get("category") == "road_sign":
             speed_match = SPEED_LIMIT.fullmatch(raw_label)
             if speed_match:
-                values["speed_limit_kmh"] = int(speed_match.group(1))
+                limit_val = int(speed_match.group(1))
+                values["speed_limit_kmh"] = limit_val
                 values["sign_message"] = (
-                    f"Speed limit {values['speed_limit_kmh']} detected"
+                    f"Speed limit {limit_val} kilometers per hour detected."
                 )
                 return "Speed Limit", values
             canonical = "-".join(
                 raw_label.replace("_", " ").replace("-", " ").split()
             ).title()
-            values["sign_message"] = ROAD_SIGN_MESSAGES.get(
-                canonical, f"{values['label']} ahead"
-            )
+            sign_msg = ROAD_SIGN_MESSAGES.get(canonical) or ROAD_SIGN_MESSAGES.get(raw_label)
+            if not sign_msg:
+                sign_msg = f"{values['label']} ahead"
+            values["sign_message"] = sign_msg
             return canonical, values
         if detection.get("category") == "pothole":
             return (
                 "Pothole" if raw_label.strip().lower() == "pothole" else raw_label,
                 values,
             )
+        if detection.get("category") == "lane_line":
+            clean_lane = raw_label.strip().lower()
+            if clean_lane in {"crossing", "crosswalk", "pedestrian crossing", "pedestrian-crossing"}:
+                values["label"] = "Pedestrian Crossing"
+                return "Crossing", values
         return raw_label, values
 
     def _conditions_match(
@@ -679,7 +691,9 @@ class ReportAlertPipeline:
                 "sign_message", f"{values.get('label', 'Road sign')} ahead"
             ),
         }
+        alert_event_id = f"evt-{rule['id']}-{track_id or 'single'}-{int(timestamp_ms)}"
         return {
+            "alert_event_id": alert_event_id,
             "rule_id": rule["id"],
             "category": detection["category"],
             "class_name": detection.get("class_name", safe_values["label"]),
@@ -689,6 +703,7 @@ class ReportAlertPipeline:
             "priority": rule["priority"],
             "confidence": float(detection.get("confidence", 0)),
             "audio_key": rule["audio_key"],
+            "cooldown_ms": rule.get("cooldown_ms", 5000),
             "severity": rule["severity"],
             "timestamp_ms": timestamp_ms,
             "visible_until_ms": timestamp_ms

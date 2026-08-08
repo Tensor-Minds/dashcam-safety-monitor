@@ -24,6 +24,7 @@ import {
   Cpu,
   ShieldCheck
 } from "lucide-react";
+import { audioAlertManager } from "@/lib/AudioAlertManager";
 
 export interface Detection {
   bbox: [number, number, number, number];
@@ -212,106 +213,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, []);
 
   const ensureAudioReady = () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
-    }
-    if (audioContextRef.current.state === "suspended") {
-      void audioContextRef.current.resume();
-    }
-  };
-
-  const speakWarning = (message: string) => {
-    if (
-      !audioWarningsEnabledRef.current
-      || !("speechSynthesis" in window)
-      || !("SpeechSynthesisUtterance" in window)
-    ) {
-      return;
-    }
-
-    const synthesizer = window.speechSynthesis;
-    synthesizer.cancel();
-    synthesizer.resume();
-
-    const utterance = new SpeechSynthesisUtterance(message);
-    const preferredVoice = synthesizer
-      .getVoices()
-      .find((voice) => voice.lang.toLowerCase().startsWith("en"));
-    if (preferredVoice) utterance.voice = preferredVoice;
-    utterance.lang = preferredVoice?.lang || "en-US";
-    utterance.rate = 0.95;
-    utterance.pitch = 1;
-    utterance.volume = 1;
-    utterance.onend = () => {
-      speechUtteranceRef.current = null;
-    };
-    utterance.onerror = () => {
-      speechUtteranceRef.current = null;
-    };
-    speechUtteranceRef.current = utterance;
-    synthesizer.speak(utterance);
+    audioAlertManager.unlockAudio();
   };
 
   const playAlertSound = (
     audioKey: string = "road_sign",
     spokenMessage?: string,
-    priority: number = 0
+    priority: number = 0,
+    primaryAlert?: PrimaryAlert | null
   ) => {
-    if (!audioWarningsEnabledRef.current) return;
     ensureAudioReady();
-    const now = Date.now();
-    const higherPriorityInterrupt = priority > lastAudioPriorityRef.current;
-    if (now - lastAudioTriggerRef.current > 5000 || higherPriorityInterrupt) {
-      lastAudioTriggerRef.current = now;
-      lastAudioPriorityRef.current = priority;
-      const audio = audioContextRef.current;
-      const frequencies =
-        audioKey === "anomaly" ? [880, 1040, 880] :
-          audioKey === "lane_departure" ? [330, 330] :
-            audioKey === "pothole" ? [560] : [720];
-      if (audio) {
-        frequencies.forEach((frequency, index) => {
-          const oscillator = audio.createOscillator();
-          const gain = audio.createGain();
-          const start = audio.currentTime + index * 0.16;
-          oscillator.type = audioKey === "anomaly" ? "square" : "sine";
-          oscillator.frequency.value = frequency;
-          gain.gain.setValueAtTime(0.12, start);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.13);
-          oscillator.connect(gain).connect(audio.destination);
-          oscillator.start(start);
-          oscillator.stop(start + 0.14);
-        });
-      }
-      if (spokenMessage) speakWarning(spokenMessage);
+    if (primaryAlert) {
+      audioAlertManager.handlePrimaryAlert(primaryAlert);
+    } else if (spokenMessage) {
+      audioAlertManager.speakText(spokenMessage);
     }
   };
 
   const toggleAudioWarnings = () => {
-    const enabled = !audioWarningsEnabledRef.current;
-    audioWarningsEnabledRef.current = enabled;
-    setAudioWarningsEnabled(enabled);
+    const next = !audioWarningsEnabled;
+    audioAlertManager.setEnabled(next);
+    setAudioWarningsEnabled(next);
 
-    if (enabled) {
-      lastAudioTriggerRef.current = 0;
-      lastAudioPriorityRef.current = 0;
-      ensureAudioReady();
+    if (next) {
       const activeAlert = currentPrimaryAlert || imageResult?.primary_alert;
       if (activeAlert) {
-        playAlertSound(
-          activeAlert.audio_key || activeAlert.category,
-          activeAlert.message,
-          activeAlert.priority
-        );
+        audioAlertManager.handlePrimaryAlert(activeAlert);
       } else {
-        playAlertSound("road_sign", "Audio warnings enabled");
+        audioAlertManager.speakText("Audio warnings enabled");
       }
-      audioUnlockConfirmedRef.current = true;
-    } else {
-      window.speechSynthesis?.cancel();
-      speechUtteranceRef.current = null;
-      audioUnlockConfirmedRef.current = false;
-      void audioContextRef.current?.suspend();
     }
   };
 
@@ -326,12 +256,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Trigger audio on image processing result
   useEffect(() => {
-    if (mediaType === "image" && imageResult?.audio_trigger) {
-      playAlertSound(
-        imageResult.primary_alert?.audio_key || imageResult.highest_priority,
-        imageResult.primary_alert?.message,
-        imageResult.primary_alert?.priority || 0
-      );
+    if (mediaType === "image" && imageResult?.primary_alert) {
+      audioAlertManager.handlePrimaryAlert(imageResult.primary_alert);
     }
   }, [imageResult, mediaType]);
 
@@ -377,12 +303,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
               totalAlerts: prev.totalAlerts + (data.detections.length > 0 ? 1 : 0)
             }));
 
-            if (data.audio_trigger) {
-              playAlertSound(
-                data.primary_alert?.audio_key || data.highest_priority,
-                data.primary_alert?.message,
-                data.primary_alert?.priority || 0
-              );
+            if (data.audio_trigger && data.primary_alert) {
+              audioAlertManager.handlePrimaryAlert(data.primary_alert);
             }
 
             const now = Date.now();
@@ -516,14 +438,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const toggleVideoPlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!videoRef.current) return;
-    ensureAudioReady();
-    if (
-      audioWarningsEnabledRef.current
-      && !audioUnlockConfirmedRef.current
-    ) {
-      speakWarning("Audio warnings enabled");
-      audioUnlockConfirmedRef.current = true;
-    }
+    audioAlertManager.unlockAudio();
 
     if (wsStatus !== "connected") {
       connectWebSocket();
