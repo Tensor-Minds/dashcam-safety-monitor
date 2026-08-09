@@ -32,7 +32,7 @@ export default function Home() {
     return getBackendUrls().apiUrl;
   };
 
-  const processImageWithModels = async (file: File, models: string[]) => {
+  const processImageWithModels = async (file: File, models: string[], speedKmh: number = 50) => {
     imageRequestRef.current?.controller.abort();
 
     if (models.length === 0) {
@@ -55,6 +55,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("models", models.join(","));
+      formData.append("simulated_vehicle_speed_kmh", String(speedKmh));
 
       const apiHost = getApiHost();
       const response = await fetch(`${apiHost}/api/process-image`, {
@@ -107,6 +108,12 @@ export default function Home() {
     setSelectedModels(models);
     if (mediaFile && mediaType === "image") {
       processImageWithModels(mediaFile, models);
+    }
+  };
+
+  const handleSpeedChange = (speedKmh: number) => {
+    if (mediaFile && mediaType === "image") {
+      processImageWithModels(mediaFile, selectedModels, speedKmh);
     }
   };
 
@@ -246,6 +253,7 @@ export default function Home() {
             onReset={handleReset}
             onRunServerVideoProcess={handleRunServerVideoProcess}
             isServerProcessingVideo={isServerProcessingVideo}
+            onSpeedChange={handleSpeedChange}
           />
         )}
 

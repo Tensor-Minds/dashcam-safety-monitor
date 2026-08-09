@@ -131,6 +131,7 @@ interface DashboardProps {
     simulatedSpeedKmh: number
   ) => void;
   isServerProcessingVideo?: boolean;
+  onSpeedChange?: (speed: number) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -142,7 +143,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   videoResult,
   onReset,
   onRunServerVideoProcess,
-  isServerProcessingVideo = false
+  isServerProcessingVideo = false,
+  onSpeedChange
 }) => {
   const [audioWarningsEnabled, setAudioWarningsEnabled] = useState(true);
   const [turnSignal, setTurnSignal] = useState<"off" | "left" | "right">("off");
@@ -779,11 +781,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
               min={0}
               max={300}
               value={simulatedSpeedKmh}
-              onChange={(event) =>
-                setSimulatedSpeedKmh(
-                  Math.min(300, Math.max(0, Number(event.target.value) || 0))
-                )
-              }
+              onChange={(event) => {
+                const newSpeed = Math.min(300, Math.max(0, Number(event.target.value) || 0));
+                setSimulatedSpeedKmh(newSpeed);
+                if (onSpeedChange) onSpeedChange(newSpeed);
+              }}
               className="w-16 bg-slate-900 rounded px-2 py-1"
             />
             km/h

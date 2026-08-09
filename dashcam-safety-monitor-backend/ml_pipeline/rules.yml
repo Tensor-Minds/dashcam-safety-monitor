@@ -207,13 +207,12 @@ rules:
   module: road_sign
   labels:
   - Speed Limit
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: warning
   priority: 9
   temporal:
-    window_frames: 5
-    minimum_hits: 3
-    minimum_duration_ms: 1500
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1500
   message: Reduce speed. Current speed is {vehicle_speed_kmh} kilometers per hour
@@ -228,12 +227,12 @@ rules:
   labels:
   - Red-Light
   - Red Light
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: warning
   priority: 8
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1500
   message: Warning. Red traffic light detected ahead.
@@ -245,12 +244,12 @@ rules:
   labels:
   - Green-Light
   - Green Light
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: info
   priority: 6
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 2000
   message: Green traffic light detected.
@@ -263,12 +262,12 @@ rules:
   - Stop
   - Stop-Ahead
   - Stop Sign
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: warning
   priority: 8
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1500
   message: Warning. Stop sign detected ahead.
@@ -305,12 +304,12 @@ rules:
   - No-U-Turn
   - Bus-Stop
   - Bus Stop
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: warning
   priority: 7
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1500
   message: '{sign_message}'
@@ -321,12 +320,12 @@ rules:
   module: road_sign
   labels:
   - Speed Limit
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: info
   priority: 6
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 2000
   message: Speed limit {speed_limit_kmh} kilometers per hour detected.
@@ -337,12 +336,12 @@ rules:
   module: road_sign
   labels:
   - '*'
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: info
   priority: 5
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 2000
   message: '{sign_message}'

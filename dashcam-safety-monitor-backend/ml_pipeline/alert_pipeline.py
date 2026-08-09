@@ -26,6 +26,20 @@ ANOMALY_LABELS = {
     "fighting": "Fighting",
     "snatching": "Snatching",
 }
+def extract_speed_limit(raw_label: str) -> Optional[int]:
+    """Extract numeric speed limit from various YOLO class label formats (e.g. speed_limit_50, 50_speed_limit, speed limit 50km/h)."""
+    if not raw_label:
+        return None
+    # 1. Matches "speed_limit_50", "speed limit 50", "speed-limit-50", "limit 50"
+    m1 = re.search(r"(?:speed[ _-]*limit|speed|limit)[ _-]*(\d{1,3})", raw_label, re.IGNORECASE)
+    if m1:
+        return int(m1.group(1))
+    # 2. Matches "50_speed_limit", "50 speed limit", "50-speed-limit"
+    m2 = re.search(r"(\d{1,3})[ _-]*(?:speed[ _-]*limit|speed|limit)", raw_label, re.IGNORECASE)
+    if m2:
+        return int(m2.group(1))
+    return None
+
 SPEED_LIMIT = re.compile(r"^speed[ _-]*limit[ _-]*(\d{1,3})$", re.IGNORECASE)
 ROAD_SIGN_MESSAGES = {
     "Green-Light": "Green traffic light detected.",
@@ -630,12 +644,11 @@ class ReportAlertPipeline:
             "vehicle_speed_kmh": vehicle_speed_kmh,
         }
         if detection.get("category") == "road_sign":
-            speed_match = SPEED_LIMIT.fullmatch(raw_label)
-            if speed_match:
-                limit_val = int(speed_match.group(1))
-                values["speed_limit_kmh"] = limit_val
+            speed_val = extract_speed_limit(raw_label)
+            if speed_val is not None:
+                values["speed_limit_kmh"] = speed_val
                 values["sign_message"] = (
-                    f"Speed limit {limit_val} kilometers per hour detected."
+                    f"Speed limit {speed_val} kilometers per hour detected."
                 )
                 return "Speed Limit", values
             canonical = "-".join(
