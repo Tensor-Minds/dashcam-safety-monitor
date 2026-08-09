@@ -546,6 +546,7 @@ class ReportAlertPipeline:
             if persist_state and self.last_primary and self.last_primary["visible_until_ms"] >= timestamp_ms:
                 retained = dict(self.last_primary)
                 retained["audio_trigger"] = False
+                retained["bbox"] = None
                 return retained
             return None
         candidates.sort(

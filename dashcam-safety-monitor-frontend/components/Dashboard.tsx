@@ -177,6 +177,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const lastAlertFeedUpdateRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
+  const isWaitingForResponseRef = useRef<boolean>(false);
+  const responseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
@@ -291,10 +294,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       ws.onmessage = (event) => {
         try {
+          isWaitingForResponseRef.current = false;
+          if (responseTimeoutRef.current) {
+            clearTimeout(responseTimeoutRef.current);
+            responseTimeoutRef.current = null;
+          }
+
           const data = JSON.parse(event.data);
           if (data.status === "connected") return;
 
-          if (data.status === "success") {
+          if (data.status === "success" && isPlayingRef.current) {
             setLiveDetections(data.detections || []);
             setCurrentPriority(data.highest_priority);
             setCurrentPrimaryAlert(data.primary_alert || null);
@@ -381,6 +390,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
     if (video.paused || video.ended) {
       setIsPlaying(false);
+      setLiveDetections([]);
+      isWaitingForResponseRef.current = false;
       return;
     }
 
@@ -393,6 +404,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
           }
         }, 150);
       }
+      return;
+    }
+
+    if (isWaitingForResponseRef.current) {
+      setTimeout(() => {
+        if (isPlayingRef.current) {
+          animationFrameRef.current = requestAnimationFrame(streamFrameLoop);
+        }
+      }, 33);
       return;
     }
 
@@ -425,7 +445,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         frame_b64: frame_b64
       };
 
+      isWaitingForResponseRef.current = true;
       wsRef.current.send(JSON.stringify(payload));
+
+      if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+      responseTimeoutRef.current = setTimeout(() => {
+        isWaitingForResponseRef.current = false;
+      }, 350);
     }
 
     setTimeout(() => {
@@ -447,6 +473,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
+      setLiveDetections([]);
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -470,6 +497,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const handleVideoPauseEvent = () => {
     setIsPlaying(false);
+    setLiveDetections([]);
+    isWaitingForResponseRef.current = false;
+    if (responseTimeoutRef.current) {
+      clearTimeout(responseTimeoutRef.current);
+      responseTimeoutRef.current = null;
+    }
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
