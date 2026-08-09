@@ -25,13 +25,9 @@ export function getBackendUrls(): { apiUrl: string; wsUrl: string } {
   // Determine API Base URL
   let apiUrl = queryApi || process.env.NEXT_PUBLIC_API_URL || "";
   if (!apiUrl) {
-    if (!isLocalhost) {
-      // Remote host or tunnel (Ngrok, Cloudflare, etc.): use frontend origin so Next.js proxies to backend
-      apiUrl = `${window.location.protocol}//${window.location.host}`;
-    } else {
-      // Local development fallback
-      apiUrl = `${window.location.protocol}//${hostname}:8000`;
-    }
+    // Always default to same-origin frontend host so Next.js proxies API requests to backend
+    // This avoids cross-origin CORS, Windows IPv6 localhost (::1) hangs, and works with Ngrok/tunnels.
+    apiUrl = `${window.location.protocol}//${window.location.host}`;
   }
 
   // Upgrade HTTP to HTTPS if main page is loaded over HTTPS

@@ -23,6 +23,7 @@ async function proxyToBackend(request: NextRequest, { params }: { params: Promis
     const fetchOptions: RequestInit = {
       method: request.method,
       headers,
+      signal: AbortSignal.timeout(30000),
     };
 
     if (request.method !== "GET" && request.method !== "HEAD") {

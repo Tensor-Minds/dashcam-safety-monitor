@@ -483,4 +483,5 @@ async def stream_frame_http(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Host "::" listens on both IPv4 (0.0.0.0) and IPv6 (::1) dual-stack interfaces
+    uvicorn.run("main:app", host="::", port=8000, reload=True)
