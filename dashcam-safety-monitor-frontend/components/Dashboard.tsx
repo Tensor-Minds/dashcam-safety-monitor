@@ -265,6 +265,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   }, [imageResult, mediaType]);
 
+  const processFrameDataResponse = (data: any) => {
+    if (data.status === "success" && isPlayingRef.current) {
+      const detections = data.detections || [];
+      setLiveDetections(detections);
+      setCurrentPriority(data.highest_priority || "normal");
+      setCurrentPrimaryAlert(data.primary_alert || null);
+      setStats((prev) => ({
+        totalFrames: prev.totalFrames + 1,
+        totalAlerts: prev.totalAlerts + (detections.length > 0 ? 1 : 0)
+      }));
+
+      if (data.audio_trigger && data.primary_alert) {
+        audioAlertManager.handlePrimaryAlert(data.primary_alert);
+      }
+
+      const now = Date.now();
+      if (detections.length > 0 && now - lastAlertFeedUpdateRef.current > 350) {
+        lastAlertFeedUpdateRef.current = now;
+        const newAlert = {
+          id: `${now}-${Math.random()}`,
+          timestamp: new Date().toLocaleTimeString(),
+          priority: data.highest_priority || "normal",
+          detections: detections
+        };
+        setAlertsFeed((prev) => [newAlert, ...prev.slice(0, 19)]);
+      }
+    }
+  };
+
   // Connect WebSocket helper function
   const connectWebSocket = () => {
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
@@ -296,31 +325,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           const data = JSON.parse(event.data);
           if (data.status === "connected") return;
 
-          if (data.status === "success" && isPlayingRef.current) {
-            setLiveDetections(data.detections || []);
-            setCurrentPriority(data.highest_priority);
-            setCurrentPrimaryAlert(data.primary_alert || null);
-            setStats((prev) => ({
-              totalFrames: prev.totalFrames + 1,
-              totalAlerts: prev.totalAlerts + (data.detections.length > 0 ? 1 : 0)
-            }));
-
-            if (data.audio_trigger && data.primary_alert) {
-              audioAlertManager.handlePrimaryAlert(data.primary_alert);
-            }
-
-            const now = Date.now();
-            if (data.detections && data.detections.length > 0 && now - lastAlertFeedUpdateRef.current > 350) {
-              lastAlertFeedUpdateRef.current = now;
-              const newAlert = {
-                id: `${now}-${Math.random()}`,
-                timestamp: new Date().toLocaleTimeString(),
-                priority: data.highest_priority,
-                detections: data.detections
-              };
-              setAlertsFeed((prev) => [newAlert, ...prev.slice(0, 19)]);
-            }
-          }
+          processFrameDataResponse(data);
         } catch (err) {
           console.error("[Dashboard WS] Frame parse error:", err);
         }
@@ -450,19 +455,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           .then((res) => (res.ok ? res.json() : Promise.reject(res)))
           .then((data) => {
             isWaitingForResponseRef.current = false;
-            if (data.status === "success" && isPlayingRef.current) {
-              setLiveDetections(data.detections || []);
-              setCurrentPriority(data.highest_priority);
-              setCurrentPrimaryAlert(data.primary_alert || null);
-              setStats((prev) => ({
-                totalFrames: prev.totalFrames + 1,
-                totalAlerts: prev.totalAlerts + ((data.detections || []).length > 0 ? 1 : 0)
-              }));
-
-              if (data.audio_trigger && data.primary_alert) {
-                audioAlertManager.handlePrimaryAlert(data.primary_alert);
-              }
-            }
+            processFrameDataResponse(data);
           })
           .catch((err) => {
             isWaitingForResponseRef.current = false;
