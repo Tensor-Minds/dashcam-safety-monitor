@@ -5,6 +5,7 @@ import { ModelSelector } from "@/components/ModelSelector";
 import { MediaUploader } from "@/components/MediaUploader";
 import { Dashboard, ProcessedImageResult, ProcessedVideoResult } from "@/components/Dashboard";
 import { Shield, Cpu, Zap, Activity } from "lucide-react";
+import { getBackendUrls } from "@/lib/config";
 
 export default function Home() {
   const [selectedModels, setSelectedModels] = useState<string[]>([
@@ -28,11 +29,7 @@ export default function Home() {
   const nextImageRequestId = useRef(0);
 
   const getApiHost = () => {
-    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-    if (typeof window !== "undefined") {
-      return `http://${window.location.hostname}:8000`;
-    }
-    return "http://localhost:8000";
+    return getBackendUrls().apiUrl;
   };
 
   const processImageWithModels = async (file: File, models: string[]) => {
@@ -62,6 +59,9 @@ export default function Home() {
       const apiHost = getApiHost();
       const response = await fetch(`${apiHost}/api/process-image`, {
         method: "POST",
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        },
         body: formData,
         signal: request.controller.signal
       });
@@ -132,6 +132,9 @@ export default function Home() {
       const apiHost = getApiHost();
       const response = await fetch(`${apiHost}/api/process-video`, {
         method: "POST",
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        },
         body: formData
       });
 

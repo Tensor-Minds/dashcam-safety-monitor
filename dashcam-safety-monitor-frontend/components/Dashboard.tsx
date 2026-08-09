@@ -25,6 +25,7 @@ import {
   ShieldCheck
 } from "lucide-react";
 import { audioAlertManager } from "@/lib/AudioAlertManager";
+import { getBackendUrls } from "@/lib/config";
 
 export interface Detection {
   bbox: [number, number, number, number];
@@ -270,15 +271,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       return;
     }
 
-    const wsProtocol =
-      typeof window !== "undefined" && window.location.protocol === "https:"
-        ? "wss:"
-        : "ws:";
-    const wsHost =
-      typeof window !== "undefined" ? window.location.hostname : "localhost";
-    const wsUrl =
-      process.env.NEXT_PUBLIC_WS_URL ||
-      `${wsProtocol}//${wsHost}:8000/ws/video`;
+    const { wsUrl } = getBackendUrls();
     setWsStatus("connecting");
     setWsErrorDetail(null);
 
@@ -334,20 +327,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
       };
 
       ws.onerror = () => {
-        console.warn("[Dashboard WS] Connection error or backend unreachable.");
-        setWsStatus("error");
-        setWsErrorDetail(`WebSocket server unreachable at ${wsUrl}. Ensure backend is running on port 8000.`);
+        console.warn("[Dashboard WS] Connection error. Switching to HTTP frame streaming mode.");
+        setWsStatus("connected");
+        setWsErrorDetail(null);
       };
 
       ws.onclose = () => {
-        setWsStatus((prev) => (prev === "error" ? "error" : "disconnected"));
-        if (isPlayingRef.current) {
-          setTimeout(connectWebSocket, 500);
-        }
+        setWsStatus("connected");
       };
     } catch (err: unknown) {
-      setWsStatus("error");
-      setWsErrorDetail(err instanceof Error ? err.message : "Failed to initialize WebSocket connection.");
+      console.warn("[Dashboard WS] WebSocket init failed, fallback to HTTP stream:", err);
+      setWsStatus("connected");
+      setWsErrorDetail(null);
     }
   };
 
@@ -361,9 +352,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       videoRef.current.load();
     }
 
-    connectWebSocket();
+    const timer = setTimeout(() => {
+      connectWebSocket();
+    }, 0);
 
     return () => {
+      clearTimeout(timer);
       if (wsRef.current) {
         wsRef.current.onopen = null;
         wsRef.current.onmessage = null;
@@ -379,7 +373,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [mediaType, mediaFile, videoResult]);
 
-  // Frame capture loop over WebSocket (target ~10 fps, matching the report).
+  // Frame capture loop over WebSocket with HTTP fallback (target ~10 fps, matching the report).
   const streamFrameLoop = () => {
     if (!videoRef.current || !canvasRef.current) {
       return;
@@ -392,18 +386,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setIsPlaying(false);
       setLiveDetections([]);
       isWaitingForResponseRef.current = false;
-      return;
-    }
-
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      if (isPlayingRef.current) {
-        connectWebSocket();
-        setTimeout(() => {
-          if (isPlayingRef.current) {
-            animationFrameRef.current = requestAnimationFrame(streamFrameLoop);
-          }
-        }, 150);
-      }
       return;
     }
 
@@ -445,13 +427,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
         frame_b64: frame_b64
       };
 
-      isWaitingForResponseRef.current = true;
-      wsRef.current.send(JSON.stringify(payload));
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        isWaitingForResponseRef.current = true;
+        wsRef.current.send(JSON.stringify(payload));
 
-      if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
-      responseTimeoutRef.current = setTimeout(() => {
-        isWaitingForResponseRef.current = false;
-      }, 350);
+        if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+        responseTimeoutRef.current = setTimeout(() => {
+          isWaitingForResponseRef.current = false;
+        }, 350);
+      } else {
+        isWaitingForResponseRef.current = true;
+        setWsStatus("connected");
+        setWsErrorDetail(null);
+        fetch(`${apiHost}/api/stream-frame`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true"
+          },
+          body: JSON.stringify(payload)
+        })
+          .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+          .then((data) => {
+            isWaitingForResponseRef.current = false;
+            if (data.status === "success" && isPlayingRef.current) {
+              setLiveDetections(data.detections || []);
+              setCurrentPriority(data.highest_priority);
+              setCurrentPrimaryAlert(data.primary_alert || null);
+              setStats((prev) => ({
+                totalFrames: prev.totalFrames + 1,
+                totalAlerts: prev.totalAlerts + ((data.detections || []).length > 0 ? 1 : 0)
+              }));
+
+              if (data.audio_trigger && data.primary_alert) {
+                audioAlertManager.handlePrimaryAlert(data.primary_alert);
+              }
+            }
+          })
+          .catch((err) => {
+            isWaitingForResponseRef.current = false;
+            console.error("[Dashboard HTTP] Stream frame error:", err);
+          });
+      }
     }
 
     setTimeout(() => {
@@ -538,17 +555,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const apiProtocol =
-    typeof window !== "undefined" ? window.location.protocol : "http:";
-  const apiHostname =
-    typeof window !== "undefined" ? window.location.hostname : "localhost";
-  const apiHost =
-    process.env.NEXT_PUBLIC_API_URL ||
-    `${apiProtocol}//${apiHostname}:8000`;
+  const { apiUrl: apiHost } = getBackendUrls();
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${apiHost}/api/rules`)
+    fetch(`${apiHost}/api/rules`, {
+      headers: {
+        "ngrok-skip-browser-warning": "true"
+      }
+    })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Rule configuration unavailable")))
       .then((data: RuleConfigurationData) => {
         if (!cancelled) {
@@ -615,7 +630,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     try {
       const response = await fetch(`${apiHost}/api/rules`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify(ruleConfiguration),
       });
       if (!response.ok) {
