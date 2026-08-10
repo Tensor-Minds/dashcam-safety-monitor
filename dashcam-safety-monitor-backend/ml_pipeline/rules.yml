@@ -11,7 +11,7 @@ system:
   maximum_mean_brightness: 250
   image_quality_status_cooldown_ms: 10000
 road_sign_filter:
-  minimum_confidence: 0.15
+  minimum_confidence: 0.5
   nms_iou_threshold: 0.45
   minimum_aspect_ratio: 0.2
   maximum_aspect_ratio: 2.5
@@ -20,19 +20,20 @@ road_sign_filter:
   minimum_hits: 1
 pothole_filter:
   minimum_confidence: 0.2
+  minimum_confidence: 0.2
   nms_iou_threshold: 0.4
-  window_frames: 2
-  minimum_hits: 1
+  window_frames: 4
+  minimum_hits: 2
 anomaly_filter:
   minimum_confidence: 0.5
   nms_iou_threshold: 0.4
   window_frames: 3
   minimum_hits: 1
 lane:
-  minimum_confidence: 0.15
+  minimum_confidence: 0.4
   ema_alpha: 0.7
   trigger_offset_ratio: 0.35
-  clear_offset_ratio: 0.2
+  clear_offset_ratio: 0.3
   minimum_duration_ms: 1500
 rules:
 - id: anomaly-accident
