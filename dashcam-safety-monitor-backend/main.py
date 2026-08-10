@@ -17,7 +17,7 @@ except ImportError:
     pass
 
 from typing import Any, Dict, List, Optional
-from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -421,6 +421,67 @@ async def websocket_video_endpoint(websocket: WebSocket):
         print(f"[WebSocket] Outer disconnect: {e}")
 
 
+@app.post("/api/stream-frame")
+async def stream_frame_http(request: Request):
+    """HTTP streaming fallback when WebSocket upgrades are unavailable or proxied through single-port ngrok."""
+    try:
+        raw_body = await request.body()
+        try:
+            payload = json.loads(raw_body)
+        except (json.JSONDecodeError, UnicodeDecodeError) as parse_err:
+            print(f"[stream-frame] JSON parse error: {parse_err}, body length={len(raw_body)}, first 200 bytes={raw_body[:200]}")
+            return JSONResponse({"status": "error", "message": f"JSON parse error: {parse_err}"}, status_code=400)
+
+        active_models = payload.get("active_models", ["road_sign", "pothole", "lane_line", "anomaly"])
+        frame_idx = payload.get("frame_idx", 0)
+        timestamp = payload.get("timestamp", 0.0)
+        turn_signal = payload.get("turn_signal", "off")
+        vehicle_speed_kmh = payload.get("simulated_vehicle_speed_kmh")
+        if vehicle_speed_kmh is not None:
+            vehicle_speed_kmh = float(vehicle_speed_kmh)
+
+        frame_b64 = payload.get("frame_b64")
+        if not frame_b64:
+            print(f"[stream-frame] Missing frame_b64. Payload keys: {list(payload.keys())}")
+            return JSONResponse({"status": "error", "message": "Missing frame_b64"}, status_code=400)
+
+        if "," in frame_b64:
+            frame_b64 = frame_b64.split(",")[1]
+
+        img_bytes = base64.b64decode(frame_b64)
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if frame is None:
+            return JSONResponse({"status": "error", "message": "Could not decode frame"}, status_code=400)
+
+        annotated_frame, detections, highest_priority, audio_trigger = fusion_manager.process_frame(
+            frame=frame,
+            active_models=active_models,
+            is_video=True,
+            timestamp_ms=float(timestamp) * 1000,
+            turn_signal=turn_signal,
+            vehicle_speed_kmh=vehicle_speed_kmh,
+        )
+
+        return JSONResponse({
+            "status": "success",
+            "frame_idx": frame_idx,
+            "timestamp": timestamp,
+            "active_models": active_models,
+            "highest_priority": highest_priority,
+            "audio_trigger": audio_trigger,
+            "detections": sanitize_for_json(detections),
+            "primary_alert": sanitize_for_json(fusion_manager.last_primary_alert),
+            "image_quality": sanitize_for_json(fusion_manager.last_image_quality),
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Host "::" listens on both IPv4 (0.0.0.0) and IPv6 (::1) dual-stack interfaces
+    uvicorn.run("main:app", host="::", port=8000, reload=True)

@@ -11,7 +11,7 @@ system:
   maximum_mean_brightness: 250
   image_quality_status_cooldown_ms: 10000
 road_sign_filter:
-  minimum_confidence: 0.15
+  minimum_confidence: 0.5
   nms_iou_threshold: 0.45
   minimum_aspect_ratio: 0.2
   maximum_aspect_ratio: 2.5
@@ -20,19 +20,20 @@ road_sign_filter:
   minimum_hits: 1
 pothole_filter:
   minimum_confidence: 0.2
+  minimum_confidence: 0.2
   nms_iou_threshold: 0.4
-  window_frames: 2
-  minimum_hits: 1
+  window_frames: 4
+  minimum_hits: 2
 anomaly_filter:
   minimum_confidence: 0.5
   nms_iou_threshold: 0.4
   window_frames: 3
   minimum_hits: 1
 lane:
-  minimum_confidence: 0.15
+  minimum_confidence: 0.4
   ema_alpha: 0.7
   trigger_offset_ratio: 0.35
-  clear_offset_ratio: 0.2
+  clear_offset_ratio: 0.3
   minimum_duration_ms: 1500
 rules:
 - id: anomaly-accident
@@ -207,13 +208,12 @@ rules:
   module: road_sign
   labels:
   - Speed Limit
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: warning
   priority: 9
   temporal:
-    window_frames: 5
-    minimum_hits: 3
-    minimum_duration_ms: 1500
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1500
   message: Reduce speed. Current speed is {vehicle_speed_kmh} kilometers per hour
@@ -228,12 +228,12 @@ rules:
   labels:
   - Red-Light
   - Red Light
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: warning
   priority: 8
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1500
   message: Warning. Red traffic light detected ahead.
@@ -245,12 +245,12 @@ rules:
   labels:
   - Green-Light
   - Green Light
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: info
   priority: 6
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 2000
   message: Green traffic light detected.
@@ -263,12 +263,12 @@ rules:
   - Stop
   - Stop-Ahead
   - Stop Sign
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: warning
   priority: 8
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1500
   message: Warning. Stop sign detected ahead.
@@ -305,12 +305,12 @@ rules:
   - No-U-Turn
   - Bus-Stop
   - Bus Stop
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: warning
   priority: 7
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1500
   message: '{sign_message}'
@@ -321,12 +321,12 @@ rules:
   module: road_sign
   labels:
   - Speed Limit
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: info
   priority: 6
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 2000
   message: Speed limit {speed_limit_kmh} kilometers per hour detected.
@@ -337,12 +337,12 @@ rules:
   module: road_sign
   labels:
   - '*'
-  minimum_confidence: 0.6
+  minimum_confidence: 0.15
   severity: info
   priority: 5
   temporal:
-    window_frames: 5
-    minimum_hits: 3
+    window_frames: 3
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 2000
   message: '{sign_message}'

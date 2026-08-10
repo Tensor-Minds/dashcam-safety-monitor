@@ -11,6 +11,7 @@ dashcam-safety-monitor-backend/static/videos/
 *.avi
 *.mov
 *.webm
+tmp/
 
 # Python bytecode & environments
 __pycache__/

@@ -332,6 +332,27 @@ class FusionManager:
             vehicle_speed_kmh=vehicle_speed_kmh,
             is_video=is_video,
         )
+
+        if not primary_alert and final_detections:
+            top_det = min(final_detections, key=lambda d: d.get("priority_rank", 99))
+            cat = top_det.get("category", "road_sign")
+            c_name = top_det.get("class_name", "Hazard")
+            conf = int(top_det.get("confidence", 0) * 100)
+            primary_alert = {
+                "rule_id": f"detection-{cat}",
+                "category": cat,
+                "class_name": c_name,
+                "message": f"Warning: {c_name} detected.",
+                "priority": 5,
+                "audio_key": cat if cat in {"road_sign", "pothole", "anomaly"} else "road_sign",
+                "audio_trigger": True,
+                "cooldown_ms": 300,
+                "severity": top_det.get("priority_level", "LOW").lower(),
+                "timestamp_ms": timestamp_ms,
+                "visible_until_ms": timestamp_ms + 2000,
+                "evidence": {"class_name": c_name, "confidence": top_det.get("confidence")}
+            }
+
         self.last_primary_alert = primary_alert
         self.last_image_quality = quality
         highest_priority = primary_alert["category"] if primary_alert else "normal"
