@@ -228,8 +228,8 @@ async def process_video(
         category_counts = {"anomaly": 0, "lane_line": 0, "pothole": 0, "road_sign": 0}
 
         frame_idx = 0
-        target_fps = fusion_manager.rule_config.system["processing_target_fps"]
-        sample_stride = max(1, round(fps / target_fps))
+        target_fps = fusion_manager.rule_config.system.get("processing_target_fps", 10)
+        sample_stride = 1 if target_fps <= 0 else max(1, round(fps / target_fps))
         latest_detections = []
         latest_primary_alert = None
 

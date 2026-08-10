@@ -1,7 +1,7 @@
 version: '2.0'
 priority_policy: higher_number_wins
 system:
-  processing_target_fps: 10
+  processing_target_fps: 0   # 0 = Process 100% of frames at native video FPS
   tracking_iou_threshold: 0.3
   duplicate_iou_threshold: 0.5
   visual_duration_ms: 2000
@@ -19,9 +19,9 @@ road_sign_filter:
   window_frames: 3
   minimum_hits: 1
 pothole_filter:
-  minimum_confidence: 0.15
+  minimum_confidence: 0.2
   nms_iou_threshold: 0.4
-  window_frames: 3
+  window_frames: 2
   minimum_hits: 1
 anomaly_filter:
   minimum_confidence: 0.5
@@ -147,8 +147,8 @@ rules:
   severity: critical
   priority: 13
   temporal:
-    window_frames: 3
-    minimum_hits: 2
+    window_frames: 2
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1000
   message: Warning. Possible pothole ahead. Reduce speed safely.
@@ -163,8 +163,8 @@ rules:
   severity: high
   priority: 12
   temporal:
-    window_frames: 3
-    minimum_hits: 2
+    window_frames: 2
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1000
   message: Warning. Road-surface damage detected ahead. Proceed carefully.
@@ -179,8 +179,8 @@ rules:
   severity: warning
   priority: 11
   temporal:
-    window_frames: 3
-    minimum_hits: 2
+    window_frames: 2
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1000
   message: Warning. Road-surface damage detected ahead. Proceed carefully.
@@ -195,8 +195,8 @@ rules:
   severity: warning
   priority: 10
   temporal:
-    window_frames: 3
-    minimum_hits: 2
+    window_frames: 2
+    minimum_hits: 1
   visual_duration_ms: 2000
   cooldown_ms: 1000
   message: Warning. Road-surface damage detected ahead. Proceed carefully.
